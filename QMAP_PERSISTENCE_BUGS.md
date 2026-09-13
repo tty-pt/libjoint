@@ -109,17 +109,17 @@ Changed to use separate files:
 ## Files Modified (libjoint)
 
 ### Core Changes
--  `/home/quirinpa/libit/src/libjoint.c`:
+-  `/home/quirinpa/libjoint/src/libjoint.c`:
   - Added `joint_close()` function (lines 619-630)
   - Fixed `sscantime()` errno bug (line 87)
   - Fixed `printtime()` missing return statements (lines 106, 111)
   - Modified `tidbs_init()` to use QM_MIRROR flag (line 165)
 
-- `/home/quirinpa/libit/include/ttypt/joint.h`:
+- `/home/quirinpa/libjoint/include/ttypt/joint.h`:
   - Added `joint_close()` documentation (lines 88-102)
 
 ### Test Infrastructure
-- `/home/quirinpa/libit/src/test.c`:
+- `/home/quirinpa/libjoint/src/test.c`:
   - Added Category 6 tests (time utilities) - 6 tests
   - Added Category 7 tests (persistence) - 5 tests (DISABLED)
   - Updated test runner to skip persistence tests
@@ -185,7 +185,7 @@ Re-enabled all 5 Category 7 persistence tests to check if qmap fixes resolved th
 
 **Command**:
 ```bash
-LD_LIBRARY_PATH=/home/quirinpa/libit/lib:/usr/lib ./bin/test
+LD_LIBRARY_PATH=/home/quirinpa/libjoint/lib:/usr/lib ./bin/test
 ```
 
 **Output**:

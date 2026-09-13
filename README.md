@@ -46,8 +46,8 @@ while (joint_next(&min, &max, &count, &who, &cur)) {
 
 ```bash
 # Clone and build
-git clone https://github.com/tty-pt/libit.git
-cd libit
+git clone https://github.com/tty-pt/libjoint.git
+cd libjoint
 make all
 
 # Run tests
@@ -74,21 +74,18 @@ These are automatically built and linked when you run `make`.
 | [JOINT_LIMITATIONS.md](./JOINT_LIMITATIONS.md) | Known limitations and workarounds |
 | [TESTING_SUMMARY.md](./TESTING_SUMMARY.md) | Test coverage and results |
 
-## Recall Kernel Adapter (roadmap — W4)
+## Recall Kernel Adapter
 
-libjoint is a time axis for the recall kernel (`rec.h` in libqmap; spec in
-libqmap's `docs/RECALL-KERNEL.md`). The planned adapter — **not yet
-implemented** — follows the contract (one filler, streams matches, seals,
-plain `int` return, additive):
+libjoint is the time axis for the recall kernel (`rec.h` in libqmap; spec
+in libqmap's `docs/RECALL-KERNEL.md`). The adapter is implemented
+(`src/libjoint.c`, self-registered under the `"joint"` name, covered by
+`src/test.c` Category 9) and follows the contract (one filler, streams
+matches, seals, plain `int` return, additive):
 
 ```c
-/* Proposed (W4), not implemented. */
+/* Exact [a,b) interval membership, entity id widened to rec_ref_t. */
 int rec_axis_fill_interval(unsigned jd, time_t a, time_t b, rec_set_t *out);
 ```
-
-Exact `[a,b)` interval membership, entity id widened to `rec_ref_t`. Until
-it lands, compose libjoint with the existing `joint_iter`/`joint_next` cursor and
-push into a `rec_set_t` yourself.
 
 ## API Overview
 
@@ -99,9 +96,41 @@ push into a `rec_set_t` yourself.
 | `joint_stop(jd, time, id)` | Record interval stop for entity |
 | `joint_iter(jd, min, max)` | Create query iterator |
 | `joint_next(...)` | Get next result from iterator |
-| `joint_split(jd, min, max)` | Split overlapping intervals |
 
-See [include/ttypt/joint.h](./include/ttypt/joint.h) for complete API documentation.
+Splitting lives in the iterator itself (`joint_iter` decomposes the
+window into constant-presence segments — see Operations below); there is
+no separate `joint_split` function. See
+[include/ttypt/joint.h](./include/ttypt/joint.h) for complete API
+documentation.
+
+## Operations
+
+What libjoint stores and answers (see `QUICK_REFERENCE.md` for worked
+patterns, `JOINT_LIMITATIONS.md` for limits):
+
+- **Record presence**: `joint_start(jd, ts, id)` turns an entity's
+  presence on (open interval, end = +infinity); `joint_stop(jd, ts, id)`
+  turns it off. One entity may hold several disjoint intervals
+  (stop, then start again). Entities are `unsigned` ids (`UINT32_MAX`
+  reserved); timestamps are `time_t` in `[LONG_MIN/2, LONG_MAX/2]`.
+- **Presence profile**: `joint_iter(jd, a, b)` + `joint_next` returns the
+  window `[a,b)` decomposed into maximal segments where the *same set*
+  of entities is present — each segment reports `min/max/count` plus its
+  full id set (`count` successive `joint_next` calls). This one query
+  shape serves every read:
+  - *point presence* ("is X present at t"): `joint_iter(jd, t, t+1)`,
+    match `who == X`;
+  - *co-presence* ("when are 3 and 4 together"): iterate the range,
+    keep segments whose id set contains both;
+  - *concurrency* ("how many at once"): read `count` per segment;
+  - *gaps* ("when is nobody present"): segments the iterator fills in
+    with `count == 0`.
+- **Kernel fill**: `rec_axis_fill_interval` (exact set of entities
+  present in `[a,b)`). Filter-only — no ranker.
+- **Not answered natively**: per-entity interval fetch ("all intervals
+  of entity X" needs a full sweep; the `id` secondary index is internal
+  only). Zero-duration intervals (`start == stop`) are stored but never
+  matched, by design.
 
 ## Performance
 

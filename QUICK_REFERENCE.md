@@ -15,8 +15,8 @@ See CHANGELOG.md for complete details.
 
 ```bash
 # Clone repository
-git clone https://github.com/tty-pt/libit.git
-cd libit
+git clone https://github.com/tty-pt/libjoint.git
+cd libjoint
 
 # Build library and tests
 make all
@@ -393,10 +393,10 @@ LD_LIBRARY_PATH=./lib ./bin/test_extended
 
 ```bash
 # Compile your program
-gcc -o myapp myapp.c -I/path/to/libit/include
+gcc -o myapp myapp.c -I/path/to/libjoint/include
 
 # Link against libjoint and dependencies
-gcc -o myapp myapp.o -L/path/to/libit/lib -ljoint -lqmap -lqsys
+gcc -o myapp myapp.o -L/path/to/libjoint/lib -ljoint -lqmap -lqsys
 ```
 
 Or use pkg-config:
@@ -406,9 +406,9 @@ gcc -o myapp myapp.c $(pkg-config --cflags --libs joint)
 
 ## Getting Help
 
-- **GitHub Issues**: https://github.com/tty-pt/libit/issues
-- **Source Code**: `/home/quirinpa/libit/src/libjoint.c`
-- **Test Examples**: `/home/quirinpa/libit/src/test.c`, `test_extended.c`
+- **GitHub Issues**: https://github.com/tty-pt/libjoint/issues
+- **Source Code**: `/home/quirinpa/libjoint/src/libjoint.c`
+- **Test Examples**: `/home/quirinpa/libjoint/src/test.c`, `test_extended.c`
 
 ## Version Info
 

@@ -987,7 +987,7 @@ __attribute__((constructor)) static void joint_rec_axis_init(void)
 }
 
 /*
- * rec_axis_open convention (PLAN-REC-QUERY.md §4.3): spec is the
+ * rec_axis_open convention (RECALL-KERNEL.md): spec is the
  * `joint_init` filename, or empty/NULL for an in-memory store. Returns
  * the jd (a small unsigned handle, like `rec_axis_fill_interval`'s ctx)
  * widened to a pointer via uintptr_t, same cast the constructor's own

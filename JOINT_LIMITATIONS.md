@@ -554,7 +554,7 @@ These limitations were discovered through systematic stress testing in Phase 4:
 ### Verification Commands
 ```bash
 # Run core tests (59 tests including validation + persistence)
-cd /home/quirinpa/libit
+cd /home/quirinpa/libjoint
 make
 LD_LIBRARY_PATH=./lib ./bin/test
 
@@ -612,12 +612,12 @@ LD_LIBRARY_PATH=./lib ./bin/test_extended
 
 ## References
 
-- **Source Code**: `/home/quirinpa/libit/src/libjoint.c`
-- **API Documentation**: `/home/quirinpa/libit/include/ttypt/joint.h`
-- **Extended Tests**: `/home/quirinpa/libit/src/test_extended.c`
-- **Core Tests**: `/home/quirinpa/libit/src/test.c`
-- **CHANGELOG**: `/home/quirinpa/libit/CHANGELOG.md`
-- **Quick Reference**: `/home/quirinpa/libit/QUICK_REFERENCE.md`
+- **Source Code**: `/home/quirinpa/libjoint/src/libjoint.c`
+- **API Documentation**: `/home/quirinpa/libjoint/include/ttypt/joint.h`
+- **Extended Tests**: `/home/quirinpa/libjoint/src/test_extended.c`
+- **Core Tests**: `/home/quirinpa/libjoint/src/test.c`
+- **CHANGELOG**: `/home/quirinpa/libjoint/CHANGELOG.md`
+- **Quick Reference**: `/home/quirinpa/libjoint/QUICK_REFERENCE.md`
 - **qmap IDM Header**: `/home/quirinpa/qmap/include/ttypt/idm.h`
 
 ---

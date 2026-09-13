@@ -16,6 +16,17 @@
  * - Multiple secondary indexes (by max time, by ID)
  * - Sorted iteration support
  *
+ * ID-uniformity contract (see RECALL-KERNEL.md):
+ * entity ids are stored and compared internally as `unsigned` (32-bit) --
+ * this is intentional, not a gap. The uniformity boundary other axis
+ * libraries (libsepal, libstoma) share is `rec_ref_t` (uint32_t, from
+ * rec.h), and it is enforced at the *fill* boundary only:
+ * rec_axis_fill_interval() widens every `who` to `rec_ref_t` before
+ * pushing it into the caller's rec_set_t. Internal storage width is each
+ * library's own choice (see libislet's identical convention for its
+ * per-cell values). Do not assume ids above UINT32_MAX round-trip through
+ * joint_start()/joint_stop()/joint_next().
+ *
  * @see qmap.h for underlying storage implementation
  */
 
@@ -259,7 +270,9 @@ void printtime(char buf[DATE_MAX_LEN], time_t ts);
  * @brief Recall-kernel time-axis filler (see ttypt/rec.h).
  *
  * Every entity present at any point in [a, b) becomes one ref in `out`
- * (rec_ref_t == the joint entity id). Refs are appended (additive) and
+ * (rec_ref_t == the joint entity id, widened from the internal 32-bit
+ * `unsigned` -- see the ID-uniformity contract note at the top of this
+ * file). Refs are appended (additive) and
  * `out` is sealed (duplicates across split segments are deduped by the
  * seal). Compatible with rec_axis_t.fill via the "joint" axis registered
  * by this library's constructor (ctx = the joint_init() handle, cast
@@ -274,7 +287,7 @@ void printtime(char buf[DATE_MAX_LEN], time_t ts);
 int rec_axis_fill_interval(unsigned jd, time_t a, time_t b, rec_set_t *out);
 
 /*
- * rec_axis_open (PLAN-REC-QUERY.md §4.3, optional CLI-open convention,
+ * rec_axis_open (RECALL-KERNEL.md "rec_axis_open convention", optional CLI-open convention,
  * not part of libqmap's core rec_query registry API): opens a joint
  * store from an opaque spec string and returns the ctx a caller then
  * passes to rec_axis_set_ctx(). spec is the joint_init() filename, or
