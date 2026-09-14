@@ -1,8 +1,10 @@
-all := libjoint test test_extended
+all := libjoint test test_extended joint_axis_store_test joint_axis_roundtrip_test
 
 LDLIBS-libjoint := -lqmap -lqsys
 LDLIBS-test := -lqmap -lqsys -ljoint
 LDLIBS-test_extended := -lqmap -lqsys -ljoint
+LDLIBS-joint_axis_store_test := -lqmap -lqsys -ljoint
+LDLIBS-joint_axis_roundtrip_test := -lqmap -lqsys -ljoint
 
 CFLAGS += -g
 CFLAGS += -O3 -mpopcnt -mavx2 -mfma

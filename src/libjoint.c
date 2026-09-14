@@ -824,6 +824,118 @@ struct joint_internal {
 	struct split_arena arena;
 };
 
+/* Safe date parse for the store adapter: mirrors sscantime's formats
+ * (ISO-8601 date+time, date-only, unix epoch digits) and timezone
+ * (mktime, tm_isdst = -1), but returns -1 instead of CBUG-aborting on
+ * bad input. prefix_ok accepts a strptime-parsed leading date with
+ * trailing content (the mm "<DATE>:<STRING>" store shape); digit epochs
+ * are whole-string only even in prefix mode. 0 with *ts on success. */
+static int
+joint_date_parse(const char *s, time_t *ts, int prefix_ok)
+{
+	struct tm tm;
+	char *tail;
+
+	if (!s || !*s || !ts)
+		return -1;
+	memset(&tm, 0, sizeof(tm));
+	tail = strptime(s, "%Y-%m-%dT%H:%M:%S", &tm);
+	if (!tail)
+		tail = strptime(s, "%Y-%m-%d", &tm);
+	if (tail) {
+		if (!prefix_ok && *tail)
+			return -1;
+		tm.tm_isdst = -1;
+		*ts = mktime(&tm);
+		return 0;
+	}
+	if (!prefix_ok) {
+		const char *p = s;
+
+		while (*p >= '0' && *p <= '9')
+			p++;
+		if (*p || p == s)
+			return -1;
+		errno = 0;
+		*ts = (time_t)strtoull(s, NULL, 10);
+		return errno ? -1 : 0;
+	}
+	return -1;
+}
+
+/* 1 when id owns exactly the interval [mn,mx] (open end tinf, backfill
+ * start mtinf), 0 otherwise. Exact (min,max,who) equality over the id
+ * index, not mere overlap — the adapter's exact-duplicate restate guard. */
+static int
+joint_has_interval(unsigned jd, uint32_t id, time_t mn, time_t mx)
+{
+	struct tidbs *tidbs = &ti_dbs[jd];
+	uint32_t c = qmap_get_multi(tidbs->id, &id);
+	const void *key, *value;
+	int found = 0;
+
+	if (c == QM_MISS)
+		return 0;
+	while (qmap_next(&key, &value, c)) {
+		const struct ti *t = value;
+
+		if (!t)
+			continue; /* replace-created dup stub: no interval here */
+		if (t->who == id && t->min == mn && t->max == mx) {
+			found = 1;
+			break;
+		}
+	}
+	qmap_fin(c);
+	return found;
+}
+
+int
+joint_erase(uint32_t jd, uint32_t id)
+{
+	struct tidbs *tidbs = &ti_dbs[jd];
+	struct ti *tis = NULL;
+	size_t n = 0, cap = 0, i;
+	uint32_t c = qmap_get_multi(tidbs->id, &id);
+	const void *key, *value;
+
+	/* Validate entity ID - UINT32_MAX is reserved as IDM_MISS sentinel */
+	if (id == UINT32_MAX) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (c == QM_MISS)
+		return 0; /* absent: idempotent no-op */
+
+	/* Collect first: deleting through the assoc mutates the id index
+	 * while its cursor is live (the pattern ti_finish_last already
+	 * follows), so finish the cursor before any del. */
+	while (qmap_next(&key, &value, c)) {
+		if (!value)
+			continue; /* replace-created dup stub: no interval here */
+		if (n == cap) {
+			size_t ncap = cap ? cap * 2 : 16;
+			struct ti *nb = realloc(tis, ncap * sizeof(*nb));
+
+			CBUG(!nb, "out of memory in joint_erase");
+			tis = nb;
+			cap = ncap;
+		}
+		memcpy(&tis[n++], value, sizeof(tis[0]));
+	}
+	qmap_fin(c);
+
+	for (i = 0; i < n; i++)
+		qmap_del(tidbs->ti, &tis[i]);
+	free(tis);
+	/* mop up residual duplicate id-index entries (a repeated native
+	 * backfill replaces the primary key while the id index keeps
+	 * QM_MULTIVALUE dups of the same (key,value) pair) */
+	qmap_del_all(tidbs->id, &id);
+	return 0;
+}
+
 joint_cur_t joint_iter(uint32_t jd, time_t start, time_t end)
 {
 	struct joint_internal *internal = malloc(sizeof(struct joint_internal));
@@ -996,7 +1108,215 @@ __attribute__((constructor)) static void joint_rec_axis_init(void)
 void *rec_axis_open(const char *spec)
 {
 	unsigned jd;
+	/* The documented jd-0 ↔ NULL collision (joint_axis_store_test.c):
+	 * idm hands out handle 0 on the first joint_init of a process, and
+	 * the recall-kernel contract reads a NULL ctx as "not bound" (the
+	 * CLI refuses queries on ctx-less leaves). Burns handle 0 once per
+	 * process so every rec_axis_open — file-backed or in-memory —
+	 * returns a handle >= 1 the caller can bind. */
+	static int burned;
+
+	if (!burned) {
+		(void)joint_init(NULL);
+		burned = 1;
+	}
 
 	jd = joint_init(spec && *spec ? (char *)spec : NULL);
 	return (void *)(uintptr_t)jd;
+}
+
+/*
+ * Phase 2A store/unstore/readback adapters (RECALL-KERNEL.md, optional
+ * CLI-specific — not libqmap core API). ctx is the jd handle widened to
+ * a pointer via uintptr_t (same cast rec_axis_open/joint_fill use); the
+ * locked contract rejects ctx == NULL, so a handle-0 store opened via
+ * rec_axis_open is unreachable through these exports. spec is reserved
+ * (NULL). The grammar is an ordered attempt over the whole value string:
+ * no comma -> open (exact date or leading-date prefix); ",B" ->
+ * close-or-backfill; "A,B" with B>A -> atomic; else EINVAL.
+ */
+int
+rec_axis_store(void *ctx, const char *spec, rec_ref_t ref, const char *value)
+{
+	unsigned jd = (unsigned)(uintptr_t)ctx;
+	const char *comma;
+	int rc;
+
+	(void)spec; /* reserved — NULL */
+	if (!ctx || !value) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (ref == UINT32_MAX) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (!*value) { /* an empty string opens nothing: loud reject */
+		errno = EINVAL;
+		return -1;
+	}
+	comma = strchr(value, ',');
+	if (!comma) {
+		/* open form: exact date first, else leading-date prefix */
+		time_t ts;
+
+		if (joint_date_parse(value, &ts, 0) == 0 ||
+		    joint_date_parse(value, &ts, 1) == 0) {
+			if (joint_has_interval(jd, ref, ts, tinf))
+				return 0;
+			rc = joint_start(jd, ts, ref);
+			return (rc < 0) ? -1 : 0;
+		}
+		errno = EINVAL;
+		return -1;
+	}
+	if (comma == value) {
+		/* close-or-backfill form ",B" */
+		time_t ts;
+
+		if (joint_date_parse(comma + 1, &ts, 0) != 0) {
+			errno = EINVAL;
+			return -1;
+		}
+		if (joint_has_interval(jd, ref, mtinf, ts))
+			return 0;
+		rc = joint_stop(jd, ts, ref);
+		return (rc < 0) ? -1 : 0;
+	}
+	/* atomic form "A,B": both clean dates, B>A checked before mutating */
+	{
+		time_t ta, tb;
+		char left[1024];
+		size_t llen = (size_t)(comma - value);
+
+		if (llen >= sizeof(left)) {
+			errno = EINVAL;
+			return -1;
+		}
+		memcpy(left, value, llen);
+		left[llen] = '\0';
+		if (joint_date_parse(left, &ta, 0) != 0 ||
+		    joint_date_parse(comma + 1, &tb, 0) != 0 || tb <= ta) {
+			errno = EINVAL;
+			return -1;
+		}
+		if (joint_has_interval(jd, ref, ta, tb))
+			return 0;
+		rc = joint_start(jd, ta, ref);
+		if (rc < 0)
+			return -1;
+		rc = joint_stop(jd, tb, ref);
+		return (rc < 0) ? -1 : 0;
+	}
+}
+
+int
+rec_axis_unstore(void *ctx, rec_ref_t ref)
+{
+	unsigned jd = (unsigned)(uintptr_t)ctx;
+
+	if (!ctx) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* joint_erase is already absent -> 0; the idempotent contract. */
+	return joint_erase(jd, ref);
+}
+
+int
+rec_axis_readback(void *ctx, rec_ref_t ref, char **blob_out, size_t *n_out)
+{
+	unsigned jd = (unsigned)(uintptr_t)ctx;
+	struct tidbs *tidbs;
+	uint32_t c;
+	const void *key, *value;
+	struct ti *tis = NULL;
+	size_t n = 0, cap = 0, i, total = 0;
+	char *blob, *p;
+
+	if (blob_out)
+		*blob_out = NULL;
+	if (n_out)
+		*n_out = 0;
+	if (!ctx || !blob_out || !n_out) {
+		errno = EINVAL;
+		return -1;
+	}
+	tidbs = &ti_dbs[jd];
+	c = qmap_get_multi(tidbs->id, &ref);
+	if (c == QM_MISS)
+		return 0; /* absent -> NULL/0, still 0 */
+
+	while (qmap_next(&key, &value, c)) {
+		if (!value)
+			continue; /* replace-created dup stub: no interval here */
+		if (n == cap) {
+			size_t ncap = cap ? cap * 2 : 16;
+			struct ti *nb = realloc(tis, ncap * sizeof(*nb));
+
+			CBUG(!nb, "out of memory in rec_axis_readback");
+			tis = nb;
+			cap = ncap;
+		}
+		memcpy(&tis[n++], value, sizeof(tis[0]));
+	}
+	qmap_fin(c);
+	if (n == 0)
+		return 0; /* id key present but empty: treat as absent */
+
+	/* one entry per interval in the store grammar: closed "A,B", open
+	 * "A", backfill ",B" — round-trippable back through store */
+	for (i = 0; i < n; i++) {
+		char a[DATE_MAX_LEN], b[DATE_MAX_LEN];
+
+		if (tis[i].min == mtinf && tis[i].max != tinf) {
+			printtime(b, tis[i].max);
+			total += 1 + strlen(b) + 1;
+		} else if (tis[i].max == tinf && tis[i].min != mtinf) {
+			printtime(a, tis[i].min);
+			total += strlen(a) + 1;
+		} else {
+			printtime(a, tis[i].min);
+			printtime(b, tis[i].max);
+			total += strlen(a) + 1 + strlen(b) + 1;
+		}
+	}
+
+	blob = malloc(total);
+	if (!blob) {
+		free(tis);
+		return -1;
+	}
+	p = blob;
+	for (i = 0; i < n; i++) {
+		char a[DATE_MAX_LEN], b[DATE_MAX_LEN];
+		size_t la, lb;
+
+		if (tis[i].min == mtinf && tis[i].max != tinf) {
+			printtime(b, tis[i].max);
+			lb = strlen(b);
+			p[0] = ',';
+			memcpy(p + 1, b, lb + 1);
+			p += 1 + lb + 1;
+		} else if (tis[i].max == tinf && tis[i].min != mtinf) {
+			printtime(a, tis[i].min);
+			la = strlen(a);
+			memcpy(p, a, la + 1);
+			p += la + 1;
+		} else {
+			printtime(a, tis[i].min);
+			printtime(b, tis[i].max);
+			la = strlen(a);
+			lb = strlen(b);
+			memcpy(p, a, la);
+			p += la;
+			*p++ = ',';
+			memcpy(p, b, lb + 1);
+			p += lb + 1;
+		}
+	}
+	free(tis);
+	*blob_out = blob;
+	*n_out = total;
+	return 0;
 }

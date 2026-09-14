@@ -87,6 +87,22 @@ matches, seals, plain `int` return, additive):
 int rec_axis_fill_interval(unsigned jd, time_t a, time_t b, rec_set_t *out);
 ```
 
+Phase 2A store half (site `mm-plan/PHASE-2-CLI.md` 2A-3, **DONE
+2026-09-14**): `joint_erase(jd, id)` removes every interval an entity owns
+(id-index walk → collect → primary del each → `qmap_del_all` mop; absent →
+0; `UINT32_MAX` → `EINVAL`; zero new stored state) plus the
+`rec_axis_store`/`unstore`/`readback` adapters. The store parses the whole
+value string in its own ordered grammar — `"A"` or `"<DATE>:<anything>"`
+open, `",B"` close-or-backfill, `"A,B"` (`B>A`) atomic, else `EINVAL` —
+with an id-index exact-match guard so exact-duplicate restates are no-ops;
+read-back is one NUL-joined buffer of entries in the same grammar. Covered
+by `src/joint_axis_store_test.c` (116 assertions, wired into `test.sh`).
+
+> Note: a `jd` of 0 widens to a NULL `ctx` pointer, which the locked
+> store contract rejects — an in-memory store opened first (handle 0) is
+> unreachable through the adapters; open the adapter store on a nonzero
+> handle.
+
 ## API Overview
 
 | Function | Description |
@@ -94,6 +110,7 @@ int rec_axis_fill_interval(unsigned jd, time_t a, time_t b, rec_set_t *out);
 | `joint_init(fname)` | Create/open database (NULL = memory only) |
 | `joint_start(jd, time, id)` | Record interval start for entity |
 | `joint_stop(jd, time, id)` | Record interval stop for entity |
+| `joint_erase(jd, id)` | Erase every interval of an entity (absent → 0) |
 | `joint_iter(jd, min, max)` | Create query iterator |
 | `joint_next(...)` | Get next result from iterator |
 
@@ -127,10 +144,11 @@ patterns, `JOINT_LIMITATIONS.md` for limits):
     with `count == 0`.
 - **Kernel fill**: `rec_axis_fill_interval` (exact set of entities
   present in `[a,b)`). Filter-only — no ranker.
-- **Not answered natively**: per-entity interval fetch ("all intervals
-  of entity X" needs a full sweep; the `id` secondary index is internal
-  only). Zero-duration intervals (`start == stop`) are stored but never
-  matched, by design.
+- **Per-entity fetch + erase**: `rec_axis_readback` (the entity's
+  intervals in the store grammar, NUL-joined) and `joint_erase` (remove
+  them all) walk the internal `id` index — O(intervals-of-entity).
+- **Not answered natively**: zero-duration intervals (`start == stop`)
+  are stored but never matched, by design.
 
 ## Performance
 

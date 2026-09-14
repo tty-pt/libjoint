@@ -286,6 +286,46 @@ void printtime(char buf[DATE_MAX_LEN], time_t ts);
  */
 int rec_axis_fill_interval(unsigned jd, time_t a, time_t b, rec_set_t *out);
 
+/**
+ * @brief Erase every interval an entity owns (Phase 2A inverse of start/stop).
+ *
+ * Walks the entity's id-index entries (qmap_get_multi on the `id` secondary),
+ * recovers each `struct ti`, and deletes it from the primary `ti` map — the
+ * associated `max`/`id` indexes are maintained automatically by qmap_assoc.
+ * Cost O(intervals-of-id), never O(store); zero new stored state.
+ *
+ * @param[in] jd Database handle from joint_init().
+ * @param[in] id Entity identifier (cannot be UINT32_MAX, reserved sentinel).
+ *
+ * @return 0 on success (even when the entity owns nothing — idempotent).
+ *         -1 on validation error (errno = EINVAL: entity ID is UINT32_MAX).
+ *
+ * @note Neighboring entities' intervals are unaffected. After erase the
+ *       entity can joint_start() a fresh timeline.
+ */
+int joint_erase(unsigned jd, unsigned id);
+
+/*
+ * Phase 2A store/unstore/readback adapters (RECALL-KERNEL.md, optional
+ * CLI-specific — not libqmap core API). ctx is the jd handle widened to a
+ * pointer via uintptr_t (same cast rec_axis_open/joint_fill use); spec is
+ * reserved (NULL). The consumer passes (ref, value) blindly; joint parses
+ * the WHOLE value string in its own ordered grammar:
+ *   "A" or "<DATE>:<anything>"  -> open interval starting at A
+ *   ",B"                        -> close an open interval / backfill [-inf,B)
+ *   "A,B" (B>A)                 -> atomic interval [A,B)
+ *   else                        -> EINVAL
+ * Native 1s (already-present / back-filled) absorb to 0. Exact-duplicate
+ * restates are no-ops via an id-index exact-match guard. store: 0 ok, -1
+ * errno EINVAL (bad grammar/args) / ERANGE (out of domain). unstore: removes
+ * every interval the ref owns, idempotent absent -> 0. readback: one
+ * malloc'd NUL-joined buffer of entries in the store grammar (closed "A,B",
+ * open "A", backfill ",B"), n_out = display chars; absent -> NULL/0, still 0.
+ */
+int rec_axis_store(void *ctx, const char *spec, rec_ref_t ref, const char *value);
+int rec_axis_unstore(void *ctx, rec_ref_t ref);
+int rec_axis_readback(void *ctx, rec_ref_t ref, char **blob_out, size_t *n_out);
+
 /*
  * rec_axis_open (RECALL-KERNEL.md "rec_axis_open convention", optional CLI-open convention,
  * not part of libqmap's core rec_query registry API): opens a joint
@@ -293,6 +333,10 @@ int rec_axis_fill_interval(unsigned jd, time_t a, time_t b, rec_set_t *out);
  * passes to rec_axis_set_ctx(). spec is the joint_init() filename, or
  * empty/NULL for an in-memory store; the returned ctx is the jd handle
  * widened to a pointer via uintptr_t (same cast joint_fill uses).
+ * Handle 0 is burned once per process: the jd-0 ↔ NULL collision means
+ * the recall kernel reads a NULL ctx as "not bound", so rec_axis_open
+ * never hands out 0 (the joint_axis_store_test.c workers' manual burn
+ * stays valid — burning twice is harmless).
  */
 void *rec_axis_open(const char *spec);
 
