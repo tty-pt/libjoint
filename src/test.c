@@ -12,6 +12,10 @@
 #include <ttypt/qsys.h>
 #include <ttypt/rec.h>
 
+struct joint_cli_opt { const char *name; int has_arg; const char *help; };
+extern const struct joint_cli_opt *rec_axis_cli_options(void);
+extern int rec_axis_config_arg(const char *name, const char *value);
+
 char *good = "✅";
 char *bad = "❌";
 
@@ -1200,6 +1204,86 @@ TEST(rec_axis_joint_decode_dates)
 	ASSERT(p->b > p->a);
 }
 
+TEST(rec_axis_joint_cli_options)
+{
+	const struct joint_cli_opt *tbl = rec_axis_cli_options();
+	int slot = -1, i;
+	const rec_axis_t *axis;
+	void *p;
+	struct { time_t a; time_t b; } *jp;
+	unsigned jd;
+	rec_set_t *out;
+	char exp_since[] = "2026-09-14";
+	char exp_until[] = "2026-09-16";
+	time_t exp_a = sscantime(exp_since);
+	time_t exp_b = sscantime(exp_until);
+	char leaf_far[] = "a=2000000000 b=2000003600";
+	char leaf_half[] = "a=2000000000";
+
+	tbl = rec_axis_cli_options();
+	ASSERT(tbl != NULL);
+	ASSERT(!strcmp(tbl[0].name, "since") && tbl[0].has_arg == 1);
+	ASSERT(!strcmp(tbl[1].name, "until") && tbl[1].has_arg == 1);
+	ASSERT(tbl[2].name == NULL);
+
+	ASSERT(rec_axis_config_arg("since", NULL) != 0);
+	ASSERT(rec_axis_config_arg("until", NULL) != 0);
+	ASSERT(rec_axis_config_arg("bogus", "x") != 0);
+	ASSERT(rec_axis_config_arg("since", "garbage") != 0);
+	ASSERT(rec_axis_config_arg("until", "2026-13-40") != 0);
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) { slot = i; break; }
+	}
+	ASSERT(slot >= 0);
+	axis = rec_axis_get(slot);
+
+	p = axis->decode(NULL);
+	ASSERT(p == NULL);
+
+	ASSERT(rec_axis_config_arg("since", "2026-09-14") == 0);
+	p = axis->decode(NULL);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, 0);
+
+	ASSERT(rec_axis_config_arg("until", "2026-09-16") == 0);
+	p = axis->decode(NULL);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, exp_b);
+
+	jd = joint_init(NULL);
+	joint_start(jd, exp_a, 10);
+	joint_stop(jd, exp_a + 86400, 10);
+	ASSERT(rec_axis_set_ctx(slot, (void *)(uintptr_t)jd) == 0);
+	axis = rec_axis_get(slot);
+	out = rec_set_new();
+	ASSERT(axis->fill(axis->ctx, p, out) == 0);
+	ASSERT(rec_ref_present(out, 10));
+	rec_set_free(out);
+
+	p = axis->decode(leaf_far);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT(jp->a > exp_a && jp->b > exp_b);
+
+	p = axis->decode(leaf_half);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT(jp->a > 1000000000);
+	ASSERT_EQ(jp->b, exp_b);
+
+	p = axis->decode("");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, exp_b);
+}
+
 TEST(rec_axis_joint_open)
 {
 	int slot = -1;
@@ -1337,6 +1421,7 @@ int main(void) {
 	RUN_TEST(rec_axis_joint_registered);
 	RUN_TEST(rec_axis_joint_decode_and_fill);
 	RUN_TEST(rec_axis_joint_decode_dates);
+	RUN_TEST(rec_axis_joint_cli_options);
 	RUN_TEST(rec_axis_joint_open);
 	
 	printf("\n=== Test Summary ===\n");

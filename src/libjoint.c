@@ -1025,6 +1025,80 @@ struct rec_joint_params {
 	time_t b;
 };
 
+static time_t joint_cli_since, joint_cli_until;
+static int joint_cli_since_set, joint_cli_until_set;
+
+static int joint_parse_time(const char *value, time_t *out)
+{
+	struct tm tm;
+	char *aux;
+	char *endptr;
+	unsigned long long ts;
+
+	if (!value || !*value)
+		return -1;
+	memset(&tm, 0, sizeof(tm));
+	aux = strptime(value, "%Y-%m-%dT%H:%M:%S", &tm);
+	if (!aux) {
+		memset(&tm, 0, sizeof(tm));
+		aux = strptime(value, "%Y-%m-%d", &tm);
+		if (!aux)
+			goto num;
+		tm.tm_isdst = -1;
+		*out = mktime(&tm);
+		return 0;
+	}
+	tm.tm_isdst = -1;
+	*out = mktime(&tm);
+	return 0;
+num:
+	errno = 0;
+	ts = strtoull(value, &endptr, 10);
+	if (errno || endptr == value || *endptr != '\0')
+		return -1;
+	*out = (time_t)ts;
+	return 0;
+}
+
+struct rec_axis_cli_option {
+	const char *name;
+	int has_arg;
+	const char *help;
+};
+
+const struct rec_axis_cli_option *rec_axis_cli_options(void)
+{
+	static const struct rec_axis_cli_option opts[] = {
+		{ "since", 1, "window start (date/timestamp)" },
+		{ "until", 1, "window end (date/timestamp)" },
+		{ NULL, 0, NULL }
+	};
+	return opts;
+}
+
+int rec_axis_config_arg(const char *name, const char *value)
+{
+	time_t t;
+
+	if (!name || !value)
+		return -1;
+	if (!strcmp(name, "since")) {
+		if (joint_parse_time(value, &t) != 0)
+			return -1;
+		joint_cli_since = t;
+		joint_cli_since_set = 1;
+		return 0;
+	}
+	if (!strcmp(name, "until")) {
+		if (joint_parse_time(value, &t) != 0)
+			return -1;
+		joint_cli_until = t;
+		joint_cli_until_set = 1;
+		return 0;
+	}
+	return -1;
+}
+
 static int joint_fill(void *ctx, void *params, rec_set_t *out)
 {
 	unsigned jd = (unsigned)(uintptr_t)ctx;
@@ -1048,9 +1122,18 @@ static void *joint_decode(const char *s)
 {
 	struct rec_joint_params *p;
 	char *buf, *cur;
+	int has_a, has_b;
 
-	if (!s)
-		return NULL;
+	if (!s || !*s) {
+		if (!joint_cli_since_set && !joint_cli_until_set)
+			return NULL;
+		p = calloc(1, sizeof(*p));
+		if (!p)
+			return NULL;
+		p->a = joint_cli_since_set ? joint_cli_since : 0;
+		p->b = joint_cli_until_set ? joint_cli_until : 0;
+		return p;
+	}
 	p = calloc(1, sizeof(*p));
 	buf = malloc(strlen(s) + 1);
 	if (!p || !buf) {
@@ -1060,6 +1143,8 @@ static void *joint_decode(const char *s)
 	}
 	strcpy(buf, s);
 	cur = buf;
+	has_a = 0;
+	has_b = 0;
 	while (*cur) {
 		char *key, *val;
 
@@ -1081,11 +1166,19 @@ static void *joint_decode(const char *s)
 			cur++;
 		if (*cur)
 			*cur++ = '\0';
-		if (!strcmp(key, "a"))
+		if (!strcmp(key, "a")) {
 			p->a = sscantime(val);
-		else if (!strcmp(key, "b"))
+			has_a = 1;
+		} else if (!strcmp(key, "b")) {
 			p->b = sscantime(val);
+			has_b = 1;
+		}
 	}
+	free(buf);
+	if (!has_a && joint_cli_since_set)
+		p->a = joint_cli_since;
+	if (!has_b && joint_cli_until_set)
+		p->b = joint_cli_until;
 	return p;
 }
 

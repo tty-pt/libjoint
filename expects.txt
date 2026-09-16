@@ -77,6 +77,7 @@ test_rec_axis_fill_interval_null_out ✅
 test_rec_axis_joint_registered ✅ ✅ ✅ ✅ ✅ 
 test_rec_axis_joint_decode_and_fill ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ 
 test_rec_axis_joint_decode_dates ✅ ✅ ✅ ✅ 
+test_rec_axis_joint_cli_options ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ 
 test_rec_axis_joint_open ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ 
 
 === Test Summary ===
