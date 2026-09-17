@@ -1027,6 +1027,8 @@ struct rec_joint_params {
 
 static time_t joint_cli_since, joint_cli_until;
 static int joint_cli_since_set, joint_cli_until_set;
+static time_t joint_cli_query_a, joint_cli_query_b;
+static int joint_cli_query_set;
 
 static int joint_parse_time(const char *value, time_t *out)
 {
@@ -1060,6 +1062,69 @@ num:
 	return 0;
 }
 
+/* End of the calendar day containing `t` (`[00:00, next 00:00)`, local
+ * TZ via tm arithmetic — never `+86400`, which shifts across DST). */
+static int joint_day_end(time_t t, time_t *out)
+{
+	struct tm *tm = localtime(&t);
+
+	if (!tm)
+		return -1;
+	tm->tm_sec = 0;
+	tm->tm_min = 0;
+	tm->tm_hour = 0;
+	tm->tm_mday += 1;
+	tm->tm_isdst = -1;
+	*out = mktime(tm);
+	return *out == (time_t)-1 ? -1 : 0;
+}
+
+/* Parse a --query value: a point timestamp (widened to its containing
+ * calendar day) or a space-free `A..B` interval. Returns 0 on success;
+ * -1 only for a well-formed but reversed `A..B` (a>b, a genuine user
+ * error); 1 for anything non-parseable — the caller accept-and-ignores,
+ * because unscoped --query is broadcast to every axis declaring it and
+ * joint must never hard-abort on a foreign value. The `A..B` form is
+ * space-free by rule: joint_decode splits specs on spaces, so a spaced
+ * interval would corrupt the leaf spec. */
+static int joint_cli_query_parse(const char *v, time_t *a, time_t *b)
+{
+	const char *dd = strstr(v, "..");
+	char *left = NULL, *right = NULL;
+	int rc;
+
+	if (!dd) {
+		if (strchr(v, ' ') || strchr(v, '\t'))
+			return 1;
+		if (joint_parse_time(v, a) != 0)
+			return 1;
+		return joint_day_end(*a, b);
+	}
+	if (dd == v || dd[2] == '\0' || strchr(v, ' ')
+			|| strchr(v, '\t'))
+		return 1;
+	left = malloc((size_t)(dd - v) + 1);
+	right = malloc(strlen(dd + 2) + 1);
+	if (!left || !right) {
+		free(left);
+		free(right);
+		return 1;
+	}
+	memcpy(left, v, (size_t)(dd - v));
+	left[dd - v] = '\0';
+	strcpy(right, dd + 2);
+	if (joint_parse_time(left, a) != 0
+			|| joint_parse_time(right, b) != 0) {
+		free(left);
+		free(right);
+		return 1;
+	}
+	rc = *a > *b ? -1 : 0;
+	free(left);
+	free(right);
+	return rc;
+}
+
 struct rec_axis_cli_option {
 	const char *name;
 	int has_arg;
@@ -1071,6 +1136,7 @@ const struct rec_axis_cli_option *rec_axis_cli_options(void)
 	static const struct rec_axis_cli_option opts[] = {
 		{ "since", 1, "window start (date/timestamp)" },
 		{ "until", 1, "window end (date/timestamp)" },
+		{ "query", 1, "point timestamp or space-free A..B interval" },
 		{ NULL, 0, NULL }
 	};
 	return opts;
@@ -1096,6 +1162,22 @@ int rec_axis_config_arg(const char *name, const char *value)
 		joint_cli_until_set = 1;
 		return 0;
 	}
+	if (!strcmp(name, "query")) {
+		time_t a, b;
+		int rc;
+
+		if (!value)
+			return -1;
+		rc = joint_cli_query_parse(value, &a, &b);
+		if (rc < 0)
+			return -1;          /* reversed interval: genuine error */
+		if (rc > 0)
+			return 0;           /* non-parseable: accept-and-ignore */
+		joint_cli_query_a = a;
+		joint_cli_query_b = b;
+		joint_cli_query_set = 1;
+		return 0;
+	}
 	return -1;
 }
 
@@ -1110,13 +1192,19 @@ static int joint_fill(void *ctx, void *params, rec_set_t *out)
 }
 
 /*
- * Decode "a=2024-01-01 b=2024-06-01T12:00:00" into a heap-owned
- * rec_joint_params (freed never — one-shot CLI process lifetime, matches
- * the other axis decode fns). Each value is parsed with sscantime, so any
- * of its accepted formats (date, date+time, unix timestamp) works. Missing
- * a/b default to 0. Key=value style (rather than a single "a:b" string) is
- * used to avoid ambiguity with the colons inside ISO-8601 time-of-day
- * values that sscantime itself accepts.
+ * Decode "a=2024-01-01 b=2024-06-01T12:00:00" (or the `query=` key, a
+ * point or space-free `A..B` interval widening a point to its day) into
+ * a heap-owned rec_joint_params (freed never — one-shot CLI process
+ * lifetime, matches the other axis decode fns). Each value is parsed with
+ * joint_parse_time (the safe variant; sscantime CBUG-aborts on garbage),
+ * so any of its accepted formats (date, date+time, unix timestamp) works.
+ * Keys whose value fails to parse are skipped; if nothing resolves (no
+ * key, no CLI fallback) decode yields NULL — a loud fill failure, never
+ * an abort. Missing a/b default to 0. Fallback per end: leaf a/b (incl.
+ * since/until aliases, and query= supplying both) > --since/--until >
+ * --query > unset. Key=value style (rather than a single "a:b" string)
+ * is used to avoid ambiguity with the colons inside ISO-8601 time-of-day
+ * values that joint_parse_time itself accepts.
  */
 static void *joint_decode(const char *s)
 {
@@ -1125,13 +1213,16 @@ static void *joint_decode(const char *s)
 	int has_a, has_b;
 
 	if (!s || !*s) {
-		if (!joint_cli_since_set && !joint_cli_until_set)
+		if (!joint_cli_since_set && !joint_cli_until_set
+				&& !joint_cli_query_set)
 			return NULL;
 		p = calloc(1, sizeof(*p));
 		if (!p)
 			return NULL;
-		p->a = joint_cli_since_set ? joint_cli_since : 0;
-		p->b = joint_cli_until_set ? joint_cli_until : 0;
+		p->a = joint_cli_since_set ? joint_cli_since
+			: (joint_cli_query_set ? joint_cli_query_a : 0);
+		p->b = joint_cli_until_set ? joint_cli_until
+			: (joint_cli_query_set ? joint_cli_query_b : 0);
 		return p;
 	}
 	p = calloc(1, sizeof(*p));
@@ -1166,19 +1257,42 @@ static void *joint_decode(const char *s)
 			cur++;
 		if (*cur)
 			*cur++ = '\0';
-		if (!strcmp(key, "a")) {
-			p->a = sscantime(val);
-			has_a = 1;
-		} else if (!strcmp(key, "b")) {
-			p->b = sscantime(val);
-			has_b = 1;
+		if (!strcmp(key, "a") || !strcmp(key, "since")) {
+			time_t t;
+			if (joint_parse_time(val, &t) == 0) {
+				p->a = t;
+				has_a = 1;
+			}
+		} else if (!strcmp(key, "b") || !strcmp(key, "until")) {
+			time_t t;
+			if (joint_parse_time(val, &t) == 0) {
+				p->b = t;
+				has_b = 1;
+			}
+		} else if (!strcmp(key, "query")) {
+			time_t a, b;
+			if (joint_cli_query_parse(val, &a, &b) == 0) {
+				p->a = a;
+				p->b = b;
+				has_a = 1;
+				has_b = 1;
+			}
 		}
 	}
 	free(buf);
+	if (!has_a && !has_b && !joint_cli_since_set
+			&& !joint_cli_until_set && !joint_cli_query_set) {
+		free(p);
+		return NULL;
+	}
 	if (!has_a && joint_cli_since_set)
 		p->a = joint_cli_since;
+	else if (!has_a && joint_cli_query_set)
+		p->a = joint_cli_query_a;
 	if (!has_b && joint_cli_until_set)
 		p->b = joint_cli_until;
+	else if (!has_b && joint_cli_query_set)
+		p->b = joint_cli_query_b;
 	return p;
 }
 

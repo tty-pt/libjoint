@@ -1204,6 +1204,52 @@ TEST(rec_axis_joint_decode_dates)
 	ASSERT(p->b > p->a);
 }
 
+TEST(rec_axis_joint_decode_rejects_garbage)
+{
+	int slot = -1;
+	int i;
+	const rec_axis_t *axis;
+	struct { time_t a; time_t b; } *p;
+	void *params;
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) {
+			slot = i;
+			break;
+		}
+	}
+	ASSERT(slot >= 0);
+	axis = rec_axis_get(slot);
+
+	/* sscantime would CBUG-abort here; the safe decode must say NULL. */
+	params = rec_axis_decode(slot, "a=garbage");
+	ASSERT(params == NULL);
+	params = rec_axis_decode(slot, "a=");
+	ASSERT(params == NULL);
+
+	/* a bad key must not poison a later good one (last-wins on the key). */
+	params = rec_axis_decode(slot, "b=garbage b=2026-06-01");
+	ASSERT(params != NULL);
+	p = params;
+	ASSERT(p->b > 0);
+	ASSERT_EQ(p->a, 0);
+
+	/* one good key with the other absent: 0 = unbounded (not NULL). */
+	params = rec_axis_decode(slot, "a=2026-09-15");
+	ASSERT(params != NULL);
+	p = params;
+	ASSERT(p->a > 0);
+	ASSERT_EQ(p->b, 0);
+
+	/* a garbage a plus a valid b: still usable, a unbounded. */
+	params = rec_axis_decode(slot, "a=garbage b=2026-09-16");
+	ASSERT(params != NULL);
+	p = params;
+	ASSERT_EQ(p->a, 0);
+	ASSERT(p->b > 0);
+}
+
 TEST(rec_axis_joint_cli_options)
 {
 	const struct joint_cli_opt *tbl = rec_axis_cli_options();
@@ -1224,7 +1270,8 @@ TEST(rec_axis_joint_cli_options)
 	ASSERT(tbl != NULL);
 	ASSERT(!strcmp(tbl[0].name, "since") && tbl[0].has_arg == 1);
 	ASSERT(!strcmp(tbl[1].name, "until") && tbl[1].has_arg == 1);
-	ASSERT(tbl[2].name == NULL);
+	ASSERT(!strcmp(tbl[2].name, "query") && tbl[2].has_arg == 1);
+	ASSERT(tbl[3].name == NULL);
 
 	ASSERT(rec_axis_config_arg("since", NULL) != 0);
 	ASSERT(rec_axis_config_arg("until", NULL) != 0);
@@ -1278,6 +1325,86 @@ TEST(rec_axis_joint_cli_options)
 	ASSERT_EQ(jp->b, exp_b);
 
 	p = axis->decode("");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, exp_b);
+}
+
+/* Runs right after rec_axis_joint_cli_options, so --since/--until are
+ * SET (2026-09-14 / 2026-09-16) — that state lets us prove the per-end
+ * fallback order since/until > query by observing query stay masked on
+ * the bare path while the leaf `query=` key wins outright. */
+TEST(rec_axis_joint_cli_query)
+{
+	const struct joint_cli_opt *tbl = rec_axis_cli_options();
+	int slot = -1, i;
+	const rec_axis_t *axis;
+	void *p;
+	struct { time_t a; time_t b; } *jp;
+	char exp_qa[] = "2026-09-17";
+	char exp_qb[] = "2026-09-18";
+	time_t qa = sscantime(exp_qa);
+	time_t qb = sscantime(exp_qb);
+	time_t day_a = sscantime("2026-09-14");
+	time_t exp_a = sscantime("2026-09-14");
+	time_t exp_b = sscantime("2026-09-16");
+
+	tbl = rec_axis_cli_options();
+	ASSERT(tbl != NULL);
+	ASSERT(!strcmp(tbl[2].name, "query") && tbl[2].has_arg == 1);
+
+	/* Point or interval through the CLI --query broadcast path. */
+	ASSERT(rec_axis_config_arg("query", NULL) != 0);
+	/* accept-and-ignore: non-parseable returns 0, stores nothing. */
+	ASSERT(rec_axis_config_arg("query", "garbage") == 0);
+	/* reversed interval is a genuine user error: -1. */
+	ASSERT(rec_axis_config_arg("query", "2026-09-19..2026-09-18") == -1);
+	/* spaced interval is non-parseable by rule: ignored, rc 0. */
+	ASSERT(rec_axis_config_arg("query", "2026-09-14 ..2026-09-15") == 0);
+
+	/* A valid interval stores CLI query state. */
+	ASSERT(rec_axis_config_arg("query", "2026-09-17..2026-09-18") == 0);
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) { slot = i; break; }
+	}
+	ASSERT(slot >= 0);
+	axis = rec_axis_get(slot);
+	ASSERT(axis && axis->decode);
+
+	/* Bare path: since/until (set by the prior test) beat --query. */
+	p = axis->decode(NULL);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, exp_b);
+
+	/* Per-end: leaf a wins over query for a; until still fills b. */
+	p = axis->decode("a=2000000000");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT(jp->a > 1000000000);
+	ASSERT_EQ(jp->b, exp_b);
+
+	/* Leaf `query=` key sets both ends (wins over CLI entirely). */
+	p = axis->decode("query=2026-09-17..2026-09-18");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, qa);
+	ASSERT_EQ(jp->b, qb);
+
+	/* Point leaf widens to its containing day (day rule). */
+	p = axis->decode("query=2026-09-14");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, day_a);
+	ASSERT(jp->b > day_a);
+	ASSERT_EQ(jp->b, sscantime("2026-09-15"));
+
+	/* Garbage leaf value is skipped; CLI since/until fall back. */
+	p = axis->decode("query=garbage");
 	ASSERT(p != NULL);
 	jp = p;
 	ASSERT_EQ(jp->a, exp_a);
@@ -1421,7 +1548,9 @@ int main(void) {
 	RUN_TEST(rec_axis_joint_registered);
 	RUN_TEST(rec_axis_joint_decode_and_fill);
 	RUN_TEST(rec_axis_joint_decode_dates);
+	RUN_TEST(rec_axis_joint_decode_rejects_garbage);
 	RUN_TEST(rec_axis_joint_cli_options);
+	RUN_TEST(rec_axis_joint_cli_query);
 	RUN_TEST(rec_axis_joint_open);
 	
 	printf("\n=== Test Summary ===\n");
