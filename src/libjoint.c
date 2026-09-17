@@ -1125,12 +1125,9 @@ static int joint_cli_query_parse(const char *v, time_t *a, time_t *b)
 	return rc;
 }
 
-struct rec_axis_cli_option {
-	const char *name;
-	int has_arg;
-	const char *help;
-};
-
+/* D14 axis-contributed CLI options: the qmap CLI broadcasts inline
+ * `--since=…` / `--until=…` / `--query=…` to every bound axis declaring
+ * them. The option struct ABI is kernel-owned in <ttypt/rec.h>. */
 const struct rec_axis_cli_option *rec_axis_cli_options(void)
 {
 	static const struct rec_axis_cli_option opts[] = {
@@ -1194,8 +1191,8 @@ static int joint_fill(void *ctx, void *params, rec_set_t *out)
 /*
  * Decode "a=2024-01-01 b=2024-06-01T12:00:00" (or the `query=` key, a
  * point or space-free `A..B` interval widening a point to its day) into
- * a heap-owned rec_joint_params (freed never — one-shot CLI process
- * lifetime, matches the other axis decode fns). Each value is parsed with
+ * a heap-owned rec_joint_params. The decode-spec grammar is kernel-owned
+ * (ttypt/rec.h rec_spec_next); the buffer is freed before returning. Each value is parsed with
  * joint_parse_time (the safe variant; sscantime CBUG-aborts on garbage),
  * so any of its accepted formats (date, date+time, unix timestamp) works.
  * Keys whose value fails to parse are skipped; if nothing resolves (no
@@ -1236,27 +1233,9 @@ static void *joint_decode(const char *s)
 	cur = buf;
 	has_a = 0;
 	has_b = 0;
-	while (*cur) {
-		char *key, *val;
-
-		while (*cur == ' ')
-			cur++;
-		if (!*cur)
-			break;
-		key = cur;
-		while (*cur && *cur != '=' && *cur != ' ')
-			cur++;
-		if (*cur != '=') {
-			if (*cur)
-				cur++;
+	for (char *key, *val; rec_spec_next(&cur, &key, &val); ) {
+		if (!val)
 			continue;
-		}
-		*cur++ = '\0';
-		val = cur;
-		while (*cur && *cur != ' ')
-			cur++;
-		if (*cur)
-			*cur++ = '\0';
 		if (!strcmp(key, "a") || !strcmp(key, "since")) {
 			time_t t;
 			if (joint_parse_time(val, &t) == 0) {

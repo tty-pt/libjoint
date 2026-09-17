@@ -12,8 +12,7 @@
 #include <ttypt/qsys.h>
 #include <ttypt/rec.h>
 
-struct joint_cli_opt { const char *name; int has_arg; const char *help; };
-extern const struct joint_cli_opt *rec_axis_cli_options(void);
+extern const struct rec_axis_cli_option *rec_axis_cli_options(void);
 extern int rec_axis_config_arg(const char *name, const char *value);
 
 char *good = "✅";
@@ -1252,7 +1251,7 @@ TEST(rec_axis_joint_decode_rejects_garbage)
 
 TEST(rec_axis_joint_cli_options)
 {
-	const struct joint_cli_opt *tbl = rec_axis_cli_options();
+	const struct rec_axis_cli_option *tbl = rec_axis_cli_options();
 	int slot = -1, i;
 	const rec_axis_t *axis;
 	void *p;
@@ -1337,7 +1336,7 @@ TEST(rec_axis_joint_cli_options)
  * the bare path while the leaf `query=` key wins outright. */
 TEST(rec_axis_joint_cli_query)
 {
-	const struct joint_cli_opt *tbl = rec_axis_cli_options();
+	const struct rec_axis_cli_option *tbl = rec_axis_cli_options();
 	int slot = -1, i;
 	const rec_axis_t *axis;
 	void *p;
