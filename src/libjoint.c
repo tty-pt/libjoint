@@ -1030,14 +1030,14 @@ static int joint_cli_since_set, joint_cli_until_set;
 static time_t joint_cli_query_a, joint_cli_query_b;
 static int joint_cli_query_set;
 
-static int joint_parse_time(const char *value, time_t *out)
+static int joint_parse_time(const char *value, const char *v_end, time_t *out)
 {
 	struct tm tm;
 	char *aux;
 	char *endptr;
 	unsigned long long ts;
 
-	if (!value || !*value)
+	if (!value || !v_end || value >= v_end)
 		return -1;
 	memset(&tm, 0, sizeof(tm));
 	aux = strptime(value, "%Y-%m-%dT%H:%M:%S", &tm);
@@ -1056,7 +1056,7 @@ static int joint_parse_time(const char *value, time_t *out)
 num:
 	errno = 0;
 	ts = strtoull(value, &endptr, 10);
-	if (errno || endptr == value || *endptr != '\0')
+	if (errno || endptr == value || endptr != v_end)
 		return -1;
 	*out = (time_t)ts;
 	return 0;
@@ -1087,42 +1087,31 @@ static int joint_day_end(time_t t, time_t *out)
  * joint must never hard-abort on a foreign value. The `A..B` form is
  * space-free by rule: joint_decode splits specs on spaces, so a spaced
  * interval would corrupt the leaf spec. */
-static int joint_cli_query_parse(const char *v, time_t *a, time_t *b)
+static int joint_cli_query_parse(const char *v, const char *v_end,
+	time_t *a, time_t *b)
 {
-	const char *dd = strstr(v, "..");
-	char *left = NULL, *right = NULL;
-	int rc;
+	const char *dd = NULL, *q;
 
-	if (!dd) {
-		if (strchr(v, ' ') || strchr(v, '\t'))
+	/* space-free by rule (the grammar splits specs on spaces) */
+	for (q = v; q < v_end; q++)
+		if (*q == ' ' || *q == '\t')
 			return 1;
-		if (joint_parse_time(v, a) != 0)
+	for (q = v; q + 1 < v_end; q++)
+		if (q[0] == '.' && q[1] == '.') {
+			dd = q;
+			break;
+		}
+	if (!dd) {
+		if (joint_parse_time(v, v_end, a) != 0)
 			return 1;
 		return joint_day_end(*a, b);
 	}
-	if (dd == v || dd[2] == '\0' || strchr(v, ' ')
-			|| strchr(v, '\t'))
+	if (dd == v || dd + 2 == v_end)
 		return 1;
-	left = malloc((size_t)(dd - v) + 1);
-	right = malloc(strlen(dd + 2) + 1);
-	if (!left || !right) {
-		free(left);
-		free(right);
+	if (joint_parse_time(v, dd, a) != 0
+			|| joint_parse_time(dd + 2, v_end, b) != 0)
 		return 1;
-	}
-	memcpy(left, v, (size_t)(dd - v));
-	left[dd - v] = '\0';
-	strcpy(right, dd + 2);
-	if (joint_parse_time(left, a) != 0
-			|| joint_parse_time(right, b) != 0) {
-		free(left);
-		free(right);
-		return 1;
-	}
-	rc = *a > *b ? -1 : 0;
-	free(left);
-	free(right);
-	return rc;
+	return *a > *b ? -1 : 0;
 }
 
 /* D14 axis-contributed CLI options: the qmap CLI broadcasts inline
@@ -1146,14 +1135,14 @@ int rec_axis_config_arg(const char *name, const char *value)
 	if (!name || !value)
 		return -1;
 	if (!strcmp(name, "since")) {
-		if (joint_parse_time(value, &t) != 0)
+		if (joint_parse_time(value, value + strlen(value), &t) != 0)
 			return -1;
 		joint_cli_since = t;
 		joint_cli_since_set = 1;
 		return 0;
 	}
 	if (!strcmp(name, "until")) {
-		if (joint_parse_time(value, &t) != 0)
+		if (joint_parse_time(value, value + strlen(value), &t) != 0)
 			return -1;
 		joint_cli_until = t;
 		joint_cli_until_set = 1;
@@ -1165,7 +1154,7 @@ int rec_axis_config_arg(const char *name, const char *value)
 
 		if (!value)
 			return -1;
-		rc = joint_cli_query_parse(value, &a, &b);
+		rc = joint_cli_query_parse(value, value + strlen(value), &a, &b);
 		if (rc < 0)
 			return -1;          /* reversed interval: genuine error */
 		if (rc > 0)
@@ -1192,73 +1181,60 @@ static int joint_fill(void *ctx, void *params, rec_set_t *out)
  * Decode "a=2024-01-01 b=2024-06-01T12:00:00" (or the `query=` key, a
  * point or space-free `A..B` interval widening a point to its day) into
  * a heap-owned rec_joint_params. The decode-spec grammar is kernel-owned
- * (ttypt/rec.h rec_spec_next); the buffer is freed before returning. Each value is parsed with
- * joint_parse_time (the safe variant; sscantime CBUG-aborts on garbage),
- * so any of its accepted formats (date, date+time, unix timestamp) works.
- * Keys whose value fails to parse are skipped; if nothing resolves (no
- * key, no CLI fallback) decode yields NULL — a loud fill failure, never
- * an abort. Missing a/b default to 0. Fallback per end: leaf a/b (incl.
- * since/until aliases, and query= supplying both) > --since/--until >
- * --query > unset. Key=value style (rather than a single "a:b" string)
- * is used to avoid ambiguity with the colons inside ISO-8601 time-of-day
- * values that joint_parse_time itself accepts.
+ * (ttypt/rec.h rec_spec_scan), read-only: values are parsed in place
+ * with the bounded joint_parse_time, so decode allocates NOTHING until
+ * the final params struct's calloc. Each value may be any format
+ * joint_parse_time accepts (date, date+time, unix timestamp). Keys whose
+ * value fails to parse are skipped; if nothing resolves (no key, no CLI
+ * fallback) decode yields NULL — a loud fill failure, never an abort.
+ * Missing a/b default to 0. Fallback per end: leaf a/b (incl. since/until
+ * aliases, and query= supplying both) > --since/--until > --query >
+ * unset. Key=value style (rather than a single "a:b" string) is used to
+ * avoid ambiguity with the colons inside ISO-8601 time-of-day values that
+ * joint_parse_time itself accepts.
  */
 static void *joint_decode(const char *s)
 {
 	struct rec_joint_params *p;
-	char *buf, *cur;
 	int has_a, has_b;
 
-	if (!s || !*s) {
-		if (!joint_cli_since_set && !joint_cli_until_set
-				&& !joint_cli_query_set)
-			return NULL;
-		p = calloc(1, sizeof(*p));
-		if (!p)
-			return NULL;
-		p->a = joint_cli_since_set ? joint_cli_since
-			: (joint_cli_query_set ? joint_cli_query_a : 0);
-		p->b = joint_cli_until_set ? joint_cli_until
-			: (joint_cli_query_set ? joint_cli_query_b : 0);
-		return p;
-	}
 	p = calloc(1, sizeof(*p));
-	buf = malloc(strlen(s) + 1);
-	if (!p || !buf) {
-		free(p);
-		free(buf);
+	if (!p)
 		return NULL;
-	}
-	strcpy(buf, s);
-	cur = buf;
 	has_a = 0;
 	has_b = 0;
-	for (char *key, *val; rec_spec_next(&cur, &key, &val); ) {
-		if (!val)
-			continue;
-		if (!strcmp(key, "a") || !strcmp(key, "since")) {
-			time_t t;
-			if (joint_parse_time(val, &t) == 0) {
-				p->a = t;
-				has_a = 1;
-			}
-		} else if (!strcmp(key, "b") || !strcmp(key, "until")) {
-			time_t t;
-			if (joint_parse_time(val, &t) == 0) {
-				p->b = t;
-				has_b = 1;
-			}
-		} else if (!strcmp(key, "query")) {
-			time_t a, b;
-			if (joint_cli_query_parse(val, &a, &b) == 0) {
-				p->a = a;
-				p->b = b;
-				has_a = 1;
-				has_b = 1;
+	if (s && *s) {
+		const char *key, *val;
+		size_t klen, vlen;
+
+		for (const char *cur = s;
+		     rec_spec_scan(&cur, &key, &klen, &val, &vlen, NULL); ) {
+			if (rec_key_eq(key, klen, "a")
+			    || rec_key_eq(key, klen, "since")) {
+				time_t t;
+				if (joint_parse_time(val, val + vlen, &t) == 0) {
+					p->a = t;
+					has_a = 1;
+				}
+			} else if (rec_key_eq(key, klen, "b")
+			           || rec_key_eq(key, klen, "until")) {
+				time_t t;
+				if (joint_parse_time(val, val + vlen, &t) == 0) {
+					p->b = t;
+					has_b = 1;
+				}
+			} else if (rec_key_eq(key, klen, "query")) {
+				time_t a, b;
+				if (joint_cli_query_parse(val, val + vlen,
+				                         &a, &b) == 0) {
+					p->a = a;
+					p->b = b;
+					has_a = 1;
+					has_b = 1;
+				}
 			}
 		}
 	}
-	free(buf);
 	if (!has_a && !has_b && !joint_cli_since_set
 			&& !joint_cli_until_set && !joint_cli_query_set) {
 		free(p);
