@@ -10,7 +10,7 @@ This document describes design limitations discovered during comprehensive testi
 | SPLITS_WHO_MASK Limit (256 entities) | **FIXED** | v1.2.0 |
 | Extreme Timestamps (overflow risk) | **FIXED** | v1.2.0 |
 | UINT32_MAX Entity ID (sentinel conflict) | **FIXED** | v1.2.0 |
-| File Persistence (qmap bugs) | **FIXED** | v1.2.1 |
+| File Persistence (corm bugs) | **FIXED** | v1.2.1 |
 | MV Index Write Efficiency (W3 regression) | **FIXED** | v1.2.2 |
 | Zero-Duration Intervals (start == stop) | **NOT FIXED** | By Design |
 
@@ -29,18 +29,18 @@ The following limitations have been addressed:
 ### Original Problem (v1.1.0)
 
 ### Description
-The `TI_MASK` constant in `src/libjoint.c:28` is defined as `0x7FF` (2047), which limits the qmap database to a maximum of approximately 2048 intervals.
+The `TI_MASK` constant in `src/libjoint.c:28` is defined as `0x7FF` (2047), which limits the corm database to a maximum of approximately 2048 intervals.
 
 ### Source Code
 ```c
 #define TI_MASK 0x7FF  // src/libjoint.c:28
 ```
 
-This mask is used when opening the qmap databases:
+This mask is used when opening the corm databases:
 ```c
-dbs->ti = qmap_open(fname, "ti", qm_ti, qm_ti, TI_MASK, flags);  // line 169
-dbs->max = qmap_open(NULL, NULL, qm_time, qm_ti, TI_MASK, QM_SORTED);  // line 170
-dbs->id = qmap_open(NULL, NULL, qm_id, qm_ti, TI_MASK, QM_SORTED);  // line 171
+dbs->ti = corm_open(fname, "ti", qm_ti, qm_ti, TI_MASK, flags);  // line 169
+dbs->max = corm_open(NULL, NULL, qm_time, qm_ti, TI_MASK, CM_SORTED);  // line 170
+dbs->id = corm_open(NULL, NULL, qm_id, qm_ti, TI_MASK, CM_SORTED);  // line 171
 ```
 
 ### Impact
@@ -111,9 +111,9 @@ The `SPLITS_WHO_MASK` constant in `src/libjoint.c:27` is defined as `0xFF` (255)
 #define SPLITS_WHO_MASK 0xFF  // src/libjoint.c:27
 ```
 
-This mask is used when creating the temporary qmap for entity IDs during split computation:
+This mask is used when creating the temporary corm for entity IDs during split computation:
 ```c
-uint32_t who_hd = qmap_open(NULL, NULL, QM_HNDL, QM_HNDL, SPLITS_WHO_MASK, 0);  // line 430
+uint32_t who_hd = corm_open(NULL, NULL, CM_HNDL, CM_HNDL, SPLITS_WHO_MASK, 0);  // line 430
 ```
 
 ### Impact
@@ -147,7 +147,7 @@ while (joint_next(&min, &max, &count, &who, &cur)) {
   ```c
   #define SPLITS_WHO_MASK 0xFFF  // 4095 max entities per split
   ```
-  **Note**: Larger masks increase memory usage for the temporary qmap
+  **Note**: Larger masks increase memory usage for the temporary corm
 
 ### Related Tests
 - `test_extended.c`: Test 2 (Many Overlapping Intervals)
@@ -175,7 +175,7 @@ while (joint_next(&min, &max, &count, &who, &cur)) {
 Timestamps near `INT64_MAX` (9,223,372,036,854,775,807) may cause overflow or undefined behavior in libjoint's internal calculations.
 
 ### Source Code
-The issue stems from timestamp arithmetic in libjoint and qmap, particularly when:
+The issue stems from timestamp arithmetic in libjoint and corm, particularly when:
 - Computing interval intersections
 - Sorting intervals by max time
 - Performing range queries with extreme values
@@ -267,10 +267,10 @@ int joint_stop(unsigned jd, time_t ts, unsigned id);
 ### Original Problem (v1.1.0)
 
 ### Description
-The entity ID value `UINT32_MAX` (0xFFFFFFFF or 4,294,967,295) conflicts with the `IDM_MISS` sentinel value used by the qmap IDM (ID Manager) module.
+The entity ID value `UINT32_MAX` (0xFFFFFFFF or 4,294,967,295) conflicts with the `IDM_MISS` sentinel value used by the corm IDM (ID Manager) module.
 
 ### Source Code
-From `qmap/include/ttypt/idm.h:26`:
+From `corm/include/ttypt/idm.h:26`:
 ```c
 #define IDM_MISS ((uint32_t)-1)  // = 0xFFFFFFFF = UINT32_MAX
 ```
@@ -324,11 +324,11 @@ joint_stop(jd, 2000, 0);
 - Document this restriction in application-level code
 
 ### Alternative Solution
-Change the sentinel value in IDM to use a different value (requires modifying qmap):
+Change the sentinel value in IDM to use a different value (requires modifying corm):
 ```c
 #define IDM_MISS 0  // Would conflict with entity ID 0 instead
 ```
-This is not recommended as it would break existing qmap APIs.
+This is not recommended as it would break existing corm APIs.
 
 ### Related Tests
 - `test_extended.c`: Test 9 (Entity ID Edge Cases)
@@ -358,25 +358,25 @@ int joint_stop(unsigned jd, time_t ts, unsigned id);
 
 ---
 
-## 5. File Persistence: qmap QM_MIRROR Bug → FIXED ✅
+## 5. File Persistence: corm CM_MIRROR Bug → FIXED ✅
 
-**Status:** FIXED in v1.2.1 (removed QM_MIRROR requirement)
+**Status:** FIXED in v1.2.1 (removed CM_MIRROR requirement)
 
 ### Original Problem (v1.1.0 - v1.2.0)
 
 ### Description
-File persistence using `joint_init("/path/to/file.db")` caused segmentation faults when closing and reopening the database. This was due to bugs in the qmap library's file persistence implementation.
+File persistence using `joint_init("/path/to/file.db")` caused segmentation faults when closing and reopening the database. This was due to bugs in the corm library's file persistence implementation.
 
 ### Root Cause
-The qmap library (prior to v0.7.0) required the `QM_MIRROR` flag for file persistence. However, qmap had multiple bugs related to QM_MIRROR:
+The corm library (prior to v0.7.0) required the `CM_MIRROR` flag for file persistence. However, corm had multiple bugs related to CM_MIRROR:
 1. Multiple databases per file failed to persist
-2. Process exit crashes with custom types and QM_MIRROR
+2. Process exit crashes with custom types and CM_MIRROR
 3. Segmentation faults when reopening file-backed databases
 
 ### Source Code
 Original code in `src/libjoint.c:166`:
 ```c
-uint32_t flags = fname ? QM_MIRROR : 0;  /* QM_MIRROR required for file persistence */
+uint32_t flags = fname ? CM_MIRROR : 0;  /* CM_MIRROR required for file persistence */
 ```
 
 ### Impact
@@ -392,14 +392,14 @@ Segmentation fault (core dumped)
 ```
 
 ### Fix Applied (v1.2.1)
-qmap v0.7.0+ (commit df5a7ac) changed file persistence to work WITHOUT QM_MIRROR:
+corm v0.7.0+ (commit df5a7ac) changed file persistence to work WITHOUT CM_MIRROR:
 - File loading now happens automatically when opening file-backed maps
-- QM_MIRROR is now optional, only needed for bidirectional lookups
-- libjoint doesn't need bidirectional lookups (no qmap_assoc usage)
+- CM_MIRROR is now optional, only needed for bidirectional lookups
+- libjoint doesn't need bidirectional lookups (no corm_assoc usage)
 
 Changed `src/libjoint.c:166`:
 ```c
-uint32_t flags = 0;  /* QM_MIRROR optional in qmap v0.7.0+, not needed for persistence */
+uint32_t flags = 0;  /* CM_MIRROR optional in corm v0.7.0+, not needed for persistence */
 ```
 
 ### Test Coverage (v1.2.1)
@@ -414,31 +414,31 @@ All 5 persistence tests now pass:
 
 ## 7. MV Index Write Efficiency (W3 regression) → FIXED ✅
 
-**Status:** FIXED in v1.2.2 (libqmap MV duplicate chains + backshift; libjoint equality reads via `qmap_get_multi`)
+**Status:** FIXED in v1.2.2 (libcorm MV duplicate chains + backshift; libjoint equality reads via `corm_get_multi`)
 
 ### Description
-Adopting qmap's QM_MULTIVALUE subsidiary indexes (W3) made every libjoint write
-and some reads hit libqmap's lazy-sorted-index design per operation:
+Adopting corm's CM_MULTIVALUE subsidiary indexes (W3) made every libjoint write
+and some reads hit libcorm's lazy-sorted-index design per operation:
 - `joint_start`/`joint_stop` → `ti_present` → full id-index qsort per insert
   (**×9–16 inserts**).
-- `ti_finish_last` delete → MV sorted rebuild per delete; `qmap_close`
+- `ti_finish_last` delete → MV sorted rebuild per delete; `corm_close`
   per-entry MV deletes → quadratic close (**hang**).
 - `joint_iter` GE-bsearch on `max` → one full rebuild per write→query burst
   (×1.9 queries).
-- A later `qmap_mv_slot` full-table probe (up to 65 536 slots) made fresh-key
+- A later `corm_mv_slot` full-table probe (up to 65 536 slots) made fresh-key
   puts O(m) again after the first fix (libjoint 10k pairs: 21.4 s → 14 ms).
 
 ### Fix (v1.2.2)
-- libqmap: per-key MV duplicate chain (O(k) `qmap_get_multi`, O(k) MV delete,
+- libcorm: per-key MV duplicate chain (O(k) `corm_get_multi`, O(k) MV delete,
   O(N) close) + hole-eliminating backshift delete (all probes early-exit).
-- libjoint: `ti_present`/`ti_finish_last` now use `qmap_get_multi()` (O(k)) with
-  `QM_MISS` guards. `ti_intersect` GE scans on `max` unchanged.
+- libjoint: `ti_present`/`ti_finish_last` now use `corm_get_multi()` (O(k)) with
+  `CM_MISS` guards. `ti_intersect` GE scans on `max` unchanged.
 
 ### Results
 All benchmarks at or below the pre-adoption baseline; 10k start+stop pairs
 2 499 442 µs → 14 297 µs; query-all 1 833 316 → 872 228 µs; 1000-cycle
 100 342 259 → 71 072 518 µs. No behavior change; all 74 tests pass.
-Requires libqmap with the MV chain + backshift (0.8.0).
+Requires libcorm with the MV chain + backshift (0.8.0).
 
 ### Related Tests
 - `src/test_extended.c`: 15 extended benchmarks; `src/test.c`: 59 core tests.
@@ -593,20 +593,20 @@ LD_LIBRARY_PATH=./lib ./bin/test_extended
 **v1.2.2 (current):**
 - TI_MASK: 0xFFFF (65,536 intervals)
 - SPLITS_WHO_MASK: 0xFFF (4,096 entities)
-- Input validation + MV index efficiency fixes (qmap_get_multi)
-- Compatible with qmap 0.8.0+ (MV duplicate chains + backshift)
+- Input validation + MV index efficiency fixes (corm_get_multi)
+- Compatible with corm 0.8.0+ (MV duplicate chains + backshift)
 
 **v1.2.1 (legacy):**
 - TI_MASK: 0xFFFF (65,536 intervals)
 - SPLITS_WHO_MASK: 0xFFF (4,096 entities)
 - Input validation enabled (errno-based error reporting)
-- Compatible with qmap b1bc322+
+- Compatible with corm b1bc322+
 
 **v1.1.0 (legacy):**
 - TI_MASK: 0x7FF (2,048 intervals)
 - SPLITS_WHO_MASK: 0xFF (256 entities)
 - No input validation
-- Compatible with qmap v0.6.0
+- Compatible with corm v0.6.0
 
 ---
 
@@ -618,18 +618,18 @@ LD_LIBRARY_PATH=./lib ./bin/test_extended
 - **Core Tests**: `/home/quirinpa/libjoint/src/test.c`
 - **CHANGELOG**: `/home/quirinpa/libjoint/CHANGELOG.md`
 - **Quick Reference**: `/home/quirinpa/libjoint/QUICK_REFERENCE.md`
-- **qmap IDM Header**: `/home/quirinpa/qmap/include/ttypt/idm.h`
+- **corm IDM Header**: `/home/quirinpa/corm/include/ttypt/idm.h`
 
 ---
 
 ## Version History
 
-- **2026-09-10 (v1.2.2)**: Fixed MV index write efficiency (W3 regression; libqmap 0.8.0 chains + backshift, libjoint qmap_get_multi)
-- **2026-02-23 (v1.2.1)**: Fixed file persistence (removed QM_MIRROR)
+- **2026-09-10 (v1.2.2)**: Fixed MV index write efficiency (W3 regression; libcorm 0.8.0 chains + backshift, libjoint corm_get_multi)
+- **2026-02-23 (v1.2.1)**: Fixed file persistence (removed CM_MIRROR)
 - **2026-02-23 (v1.2.0)**: Fixed 4 of 5 limitations - mask increases and input validation
 - **2026-02-23 (v1.1.0)**: Initial documentation (Phase 4 extended testing)
-- **qmap b1bc322**: Prior dependency baseline
-- **qmap v0.6.0**: Original dependency version
+- **corm b1bc322**: Prior dependency baseline
+- **corm v0.6.0**: Original dependency version
 
 ---
 

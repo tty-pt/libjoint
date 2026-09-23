@@ -6,12 +6,12 @@
  * @brief Public API for the Interval Tree Library (libjoint).
  *
  * Provides an efficient interval tree implementation for tracking
- * time-based intervals with persistence support. Built on libqmap
+ * time-based intervals with persistence support. Built on libcorm
  * for high-performance querying and sorted iteration.
  *
  * Key features:
  * - Store and query time intervals with associated IDs
- * - File-based persistence via qmap
+ * - File-based persistence via corm
  * - Efficient intersection queries
  * - Multiple secondary indexes (by max time, by ID)
  * - Sorted iteration support
@@ -27,7 +27,7 @@
  * per-cell values). Do not assume ids above UINT32_MAX round-trip through
  * joint_start()/joint_stop()/joint_next().
  *
- * @see qmap.h for underlying storage implementation
+ * @see corm.h for underlying storage implementation
  */
 
 #include <time.h>
@@ -57,7 +57,7 @@ typedef void * joint_cur_t;
  * @brief Initialize an interval tree database.
  *
  * Creates or opens a file-backed interval tree with three
- * internal qmap databases:
+ * internal corm databases:
  * - "ti": Primary map (interval -> interval)
  * - "max": Secondary index sorted by interval max time
  * - "id": Secondary index sorted by entity ID
@@ -69,7 +69,7 @@ typedef void * joint_cur_t;
  *         Handle is an integer ID that remains valid until
  *         process exit (no explicit close needed).
  *
- * @note File persistence uses qmap's automatic save-on-exit.
+ * @note File persistence uses corm's automatic save-on-exit.
  *       Multiple databases can share one file via different names.
  *
  * @see joint_start
@@ -79,7 +79,7 @@ typedef void * joint_cur_t;
  * Example:
  * @code
  * // Create persistent interval tree
- * uint32_t jd = joint_init("events.qmap");
+ * uint32_t jd = joint_init("events.corm");
  * 
  * // Add intervals
  * joint_start(jd, timestamp1, user_id);
@@ -99,7 +99,7 @@ unsigned joint_init(char *fname);
 /**
  * @brief Close an interval tree database and free resources.
  *
- * Closes all associated qmap databases for the given handle,
+ * Closes all associated corm databases for the given handle,
  * ensuring data is persisted to disk. After calling this function,
  * the handle should not be used again.
  *
@@ -289,9 +289,9 @@ int rec_axis_fill_interval(unsigned jd, time_t a, time_t b, rec_set_t *out);
 /**
  * @brief Erase every interval an entity owns (Phase 2A inverse of start/stop).
  *
- * Walks the entity's id-index entries (qmap_get_multi on the `id` secondary),
+ * Walks the entity's id-index entries (corm_get_multi on the `id` secondary),
  * recovers each `struct ti`, and deletes it from the primary `ti` map — the
- * associated `max`/`id` indexes are maintained automatically by qmap_assoc.
+ * associated `max`/`id` indexes are maintained automatically by corm_assoc.
  * Cost O(intervals-of-id), never O(store); zero new stored state.
  *
  * @param[in] jd Database handle from joint_init().
@@ -307,7 +307,7 @@ int joint_erase(unsigned jd, unsigned id);
 
 /*
  * Phase 2A store/unstore/readback adapters (RECALL-KERNEL.md, optional
- * CLI-specific — not libqmap core API). ctx is the jd handle widened to a
+ * CLI-specific — not libcorm core API). ctx is the jd handle widened to a
  * pointer via uintptr_t (same cast rec_axis_open/joint_fill use); spec is
  * reserved (NULL). The consumer passes (ref, value) blindly; joint parses
  * the WHOLE value string in its own ordered grammar:
@@ -328,7 +328,7 @@ int rec_axis_readback(void *ctx, rec_ref_t ref, char **blob_out, size_t *n_out);
 
 /*
  * rec_axis_open (RECALL-KERNEL.md "rec_axis_open convention", optional CLI-open convention,
- * not part of libqmap's core rec_query registry API): opens a joint
+ * not part of libcorm's core rec_query registry API): opens a joint
  * store from an opaque spec string and returns the ctx a caller then
  * passes to rec_axis_set_ctx(). spec is the joint_init() filename, or
  * empty/NULL for an in-memory store; the returned ctx is the jd handle

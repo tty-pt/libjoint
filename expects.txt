@@ -20,9 +20,9 @@ test_backward_interval ✅
 === Category 3: Multiple Entities ===
 test_multiple_entities_separate ✅ ✅ ✅ 
 test_multiple_entities_overlapping ✅ ✅ ✅ 
-test_qmap_association_two_entities ✅ ✅ 
-test_qmap_association_reverse_order ✅ ✅ ✅ 
-test_qmap_association_mixed_order ✅ ✅ ✅ ✅ 
+test_corm_association_two_entities ✅ ✅ 
+test_corm_association_reverse_order ✅ ✅ ✅ 
+test_corm_association_mixed_order ✅ ✅ ✅ ✅ 
 test_multiple_entities_nonoverlapping ✅ 
 test_same_entity_multiple_intervals ✅ 
 test_interleaved_operations ✅ 

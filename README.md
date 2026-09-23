@@ -1,6 +1,6 @@
 # libjoint - Interval Tree Library
 
-A high-performance C library for storing and querying time-based intervals. Built on top of [qmap](https://github.com/tty-pt/qmap) for efficient sorted storage and iteration.
+A high-performance C library for storing and querying time-based intervals. Built on top of [corm](https://github.com/tty-pt/corm) for efficient sorted storage and iteration.
 
 ## What is libjoint?
 
@@ -16,7 +16,7 @@ libjoint allows you to:
 - **High capacity**: Store up to 65,536 intervals per database
 - **High overlap support**: Handle up to 4,096 concurrent overlapping entities
 - **Fast queries**: Microsecond-level query performance
-- **File persistence**: Built on qmap for reliable disk storage
+- **File persistence**: Built on corm for reliable disk storage
 - **Clean API**: Simple C interface with error handling
 - **Zero-copy iteration**: Efficient traversal of query results
 
@@ -25,7 +25,7 @@ libjoint allows you to:
 ```c
 #include <ttypt/joint.h>
 
-// Create database (NULL = memory only, "data.qmap" = persisted)
+// Create database (NULL = memory only, "data.corm" = persisted)
 unsigned jd = joint_init(NULL);
 
 // Record that entity 1 was active from time 1000 to 2000
@@ -59,7 +59,7 @@ LD_LIBRARY_PATH=./lib ./bin/test
 
 ## Dependencies
 
-- **qmap** - Sorted key-value store with persistence
+- **corm** - Sorted key-value store with persistence
 - **qsys** - System utilities library
 - **libc** - Standard C library (already on your system)
 
@@ -76,8 +76,8 @@ These are automatically built and linked when you run `make`.
 
 ## Recall Kernel Adapter
 
-libjoint is the time axis for the recall kernel (`rec.h` in libqmap; spec
-in libqmap's `docs/RECALL-KERNEL.md`). The adapter is implemented
+libjoint is the time axis for the recall kernel (`rec.h` in libcorm; spec
+in libcorm's `docs/RECALL-KERNEL.md`). The adapter is implemented
 (`src/libjoint.c`, self-registered under the `"joint"` name, covered by
 `src/test.c` Category 9) and follows the contract (one filler, streams
 matches, seals, plain `int` return, additive):
@@ -89,7 +89,7 @@ int rec_axis_fill_interval(unsigned jd, time_t a, time_t b, rec_set_t *out);
 
 Phase 2A store half (site `mm-plan/PHASE-2-CLI.md` 2A-3, **DONE
 2026-09-14**): `joint_erase(jd, id)` removes every interval an entity owns
-(id-index walk → collect → primary del each → `qmap_del_all` mop; absent →
+(id-index walk → collect → primary del each → `corm_del_all` mop; absent →
 0; `UINT32_MAX` → `EINVAL`; zero new stored state) plus the
 `rec_axis_store`/`unstore`/`readback` adapters. The store parses the whole
 value string in its own ordered grammar — `"A"` or `"<DATE>:<anything>"`
@@ -155,7 +155,7 @@ patterns, `JOINT_LIMITATIONS.md` for limits):
 Build flags: `-O3 -mpopcnt -mavx2 -mfma` (see `Makefile`). The query path
 uses contiguous arenas for matches and splits plus an ephemeral
 open-addressing entity set (no per-match/per-entity mallocs, no temp
-qmap per gap). Record the numbers yourself:
+corm per gap). Record the numbers yourself:
 
 ```bash
 make bench   # bin/test_extended with µs timing lines
@@ -179,5 +179,5 @@ See repository for details.
 
 ## Acknowledgments
 
-- [qmap](https://github.com/tty-pt/qmap) - Underlying storage engine
+- [corm](https://github.com/tty-pt/corm) - Underlying storage engine
 - Leon - Debugging assistance

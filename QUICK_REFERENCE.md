@@ -35,7 +35,7 @@ make all
 unsigned jd = joint_init(NULL);
 
 // File-backed database (persists to disk)
-unsigned jd = joint_init("mydata.qmap");
+unsigned jd = joint_init("mydata.corm");
 ```
 
 ### Record Intervals
@@ -84,7 +84,7 @@ printtime(buf, t);  // "2024-01-15T10:30:00"
 
 ### Cleanup (Future Use)
 ```c
-// Currently ineffective due to qmap bugs
+// Currently ineffective due to corm bugs
 joint_close(jd);
 ```
 
@@ -154,13 +154,13 @@ joint_stop(jd, t + 1, id);  // Minimum duration of 1
 ### ✅ File Persistence NOW WORKING (v1.2.1+)
 ```c
 // This NOW works in v1.2.1+:
-unsigned jd = joint_init("data.qmap");
+unsigned jd = joint_init("data.corm");
 // ... operations ...
 joint_close(jd);
-// Data is saved and loaded on next joint_init("data.qmap")!
+// Data is saved and loaded on next joint_init("data.corm")!
 ```
 
-**Note**: In v1.2.1, removed QM_MIRROR flag (qmap v0.7.0+ no longer requires it)
+**Note**: In v1.2.1, removed CM_MIRROR flag (corm v0.7.0+ no longer requires it)
 
 ### ✅ Design Limitations (All Fixed in v1.2.1!)
 
@@ -359,7 +359,7 @@ LD_LIBRARY_PATH=./lib ./bin/test_extended
 
 - **TESTING_SUMMARY.md**: Complete testing overview
 - **JOINT_LIMITATIONS.md**: Detailed limitation explanations
-- **QMAP_PERSISTENCE_BUGS.md**: Persistence bug investigation
+- **CORM_PERSISTENCE_BUGS.md**: Persistence bug investigation
 - **CHANGELOG.md**: Version history and changes
 - **include/ttypt/joint.h**: API reference (Doxygen comments)
 
@@ -396,7 +396,7 @@ LD_LIBRARY_PATH=./lib ./bin/test_extended
 gcc -o myapp myapp.c -I/path/to/libjoint/include
 
 # Link against libjoint and dependencies
-gcc -o myapp myapp.o -L/path/to/libjoint/lib -ljoint -lqmap -lqsys
+gcc -o myapp myapp.o -L/path/to/libjoint/lib -ljoint -lcorm -lqsys
 ```
 
 Or use pkg-config:
@@ -413,7 +413,7 @@ gcc -o myapp myapp.c $(pkg-config --cflags --libs joint)
 ## Version Info
 
 - **Version**: libjoint v1.2.1
-- **Dependencies**: qmap v0.7.0+, qsys
+- **Dependencies**: corm v0.7.0+, qsys
 - **Status**: Production-ready with full persistence support
 - **Features**: 65k intervals, 4k overlaps, input validation, file persistence
 - **License**: BSD-2-Clause

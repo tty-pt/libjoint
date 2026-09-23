@@ -6,5 +6,5 @@ includedir=${prefix}/include
 Name: joint
 Description: Easy interval tree library
 Version: 1.1.0
-Libs: -ljoint -lqmap -lqsys
+Libs: -ljoint -lcorm -lqsys
 Cflags:

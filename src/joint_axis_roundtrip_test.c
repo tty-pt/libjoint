@@ -1,8 +1,8 @@
 /* 2A-5 joint — file-backed cross-process round-trip.
  * Self-exec harness (see libsepal/islet 2A-5 siblings): orchestrator
  * fork+exec's itself per phase so every reopen is a fresh process reading
- * what the prior phase's qmap_save()+destructor flushed to disk; never
- * qmap_close (no-close invariant). Every worker burns handle 0 first
+ * what the prior phase's corm_save()+destructor flushed to disk; never
+ * corm_close (no-close invariant). Every worker burns handle 0 first
  * ((void)joint_init(NULL) — the documented jd-0 ↔ NULL collision,
  * joint_axis_store_test.c:60-68), then rec_axis_open(path).
  *
@@ -26,9 +26,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <ttypt/qmap.h>
+#include <ttypt/corm.h>
 
-#define DB_PATH "/tmp/test_joint_roundtrip.qmap"
+#define DB_PATH "/tmp/test_joint_roundtrip.corm"
 
 static int
 present(unsigned jd, time_t when, unsigned id)
@@ -73,7 +73,7 @@ phase_seed(void)
 		return 1;
 	if (!present(jd, D("2026-04-01"), 14))
 		return 1;
-	qmap_save();
+	corm_save();
 	return 0;
 }
 
@@ -131,7 +131,7 @@ phase_unstore(void)
 			return 1;
 		free(blob);
 	}
-	qmap_save();
+	corm_save();
 	return 0;
 }
 

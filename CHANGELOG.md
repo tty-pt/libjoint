@@ -24,7 +24,7 @@ Public API unchanged. All work is in the query/split path
   blocks never move so TAILQ pointers and `split->ids` stay stable
   across `splits_fill` recursion); split id lists are contiguous
   `uint32_t` LIFO stacks. Dead `splits_free` removed.
-- **T4**: the temp per-gap qmap (`qmap_open`/`qmap_close` on every
+- **T4**: the temp per-gap corm (`corm_open`/`corm_close` on every
   `splits_get`) replaced by an ephemeral open-addressing `who_set`
   (tombstone deletions, count maintained so `split_create` is
   single-pass); `SPLITS_WHO_MASK` retired.
@@ -70,16 +70,16 @@ before). Valgrind out of scope per project policy.
 ### Fixed — W3 index-read efficiency regression
 
 - Equality reads (`ti_present`, `ti_finish_last`) now use
-  `qmap_get_multi()` instead of `qmap_iter(…, QM_RANGE)`: the same
+  `corm_get_multi()` instead of `corm_iter(…, CM_RANGE)`: the same
   duplicate-set iteration but O(k) per key (chain walk) with no
   full-table unsorted-to-sorted rebuild of the MV indexes.
-  libqmap ≥ 0.8.0 (chains) / ≥ 0.8.0-backshift (no-holes) required;
+  libcorm ≥ 0.8.0 (chains) / ≥ 0.8.0-backshift (no-holes) required;
   compat floors otherwise unchanged (≥ `1a4bfa2` auto-grow,
   ≥ `b1bc322` assoc-multivalue).
 - No public `joint_*` behavior changed; `ti_intersect` GE scans on `max`
   unchanged.
 
-### Performance (vs pre-W3 baseline, new libqmap)
+### Performance (vs pre-W3 baseline, new libcorm)
 
 | Bench | Baseline | Now |
 |---|---|---|
@@ -100,10 +100,10 @@ before). Valgrind out of scope per project policy.
 ### Fixed - File Persistence
 
 **File Persistence Now Works** ✅
-- Removed QM_MIRROR flag from `joint_init()` (src/libjoint.c:166)
-- **Root cause:** qmap v0.7.0+ no longer requires QM_MIRROR for file persistence
-- **Solution:** Changed flags from `QM_MIRROR` to `0`
-- **Why it works:** libjoint doesn't need bidirectional lookups (qmap_assoc), so QM_MIRROR was unnecessary
+- Removed CM_MIRROR flag from `joint_init()` (src/libjoint.c:166)
+- **Root cause:** corm v0.7.0+ no longer requires CM_MIRROR for file persistence
+- **Solution:** Changed flags from `CM_MIRROR` to `0`
+- **Why it works:** libjoint doesn't need bidirectional lookups (corm_assoc), so CM_MIRROR was unnecessary
 
 **Test Results:**
 - All 5 Category 7 persistence tests now passing:
@@ -117,7 +117,7 @@ before). Valgrind out of scope per project policy.
 
 ### Documentation Updated
 - JOINT_LIMITATIONS.md: Added section 5 for persistence fix
-- QMAP_PERSISTENCE_BUGS.md: Marked as resolved
+- CORM_PERSISTENCE_BUGS.md: Marked as resolved
 
 ---
 
@@ -196,10 +196,10 @@ before). Valgrind out of scope per project policy.
 - Workaround: Use minimum duration of 1 time unit
 
 **Persistence Tests (Still Failing)**
-- Re-tested with qmap b1bc322 (includes df5a7ac file loading fix)
+- Re-tested with corm b1bc322 (includes df5a7ac file loading fix)
 - Result: Segmentation fault - bugs still present
-- Category 7 tests remain disabled pending upstream qmap fixes
-- See QMAP_PERSISTENCE_BUGS.md for updated test results
+- Category 7 tests remain disabled pending upstream corm fixes
+- See CORM_PERSISTENCE_BUGS.md for updated test results
 
 ### Performance
 
@@ -211,22 +211,22 @@ Performance remains excellent with increased limits:
 
 ### Compatibility
 
-- **qmap version:** b1bc322+ (tested with b1bc322)
+- **corm version:** b1bc322+ (tested with b1bc322)
 - **Breaking changes:** None - backward compatible API
 - **New behavior:** Validation errors return -1 (previously would silently fail or corrupt data)
 
 ## [1.1.0] - 2026-02-23
 
 ### Changed
-- Align project structure with qmap v0.6.0 patterns
-- Update .gitignore with build artifact and test file patterns (/bin, /*.db, /*.qmap, /man)
+- Align project structure with corm v0.6.0 patterns
+- Update .gitignore with build artifact and test file patterns (/bin, /*.db, /*.corm, /man)
 - Add Doxygen support for automatic man page generation
 - Enhance API documentation in joint.h with comprehensive Doxygen comments
-- Update dependencies in joint.pc (libqmap, libqsys instead of libqdb, libdb)
+- Update dependencies in joint.pc (libcorm, libqsys instead of libqdb, libdb)
 - Establish CHANGELOG for version tracking
 
 ### Fixed
-- Fixed missing qmap_fin() calls in ti_intersect() and split_create() causing memory leaks (Phase 2)
+- Fixed missing corm_fin() calls in ti_intersect() and split_create() causing memory leaks (Phase 2)
 - Fixed integer underflow bug in splits_create() when matches_l=0 causing infinite loop and corruption (Phase 2)
 - Added proper empty result handling in splits_get() for query ranges with no matches (Phase 2)
 - Fixed errno not being reset in sscantime() before strtoull() call, causing false positives (Phase 3 - src/libjoint.c:87)
@@ -240,7 +240,7 @@ Performance remains excellent with increased limits:
   - Category 4: Intersection query tests (8 tests)
   - Category 5: Split computation tests (8 tests)
   - Category 6: Time utilities tests (6 tests - sscantime, printtime)
-  - Category 7: Persistence tests (5 tests - DISABLED due to qmap bugs)
+  - Category 7: Persistence tests (5 tests - DISABLED due to corm bugs)
   - **Category 8: Extended tests** (12 tests - stress, performance, edge cases):
     - Test 1: Large dataset stress test (2000 intervals)
     - Test 2: Many overlapping intervals (250 entities)
@@ -261,11 +261,11 @@ Performance remains excellent with increased limits:
 - Added joint_close() function for future persistence support (currently no-op for in-memory databases)
 
 ### Notes
-- Code is fully compatible with qmap v0.6.0 (updated in v1.0.0)
-- Benefits from qmap v0.6.0 improvements:
+- Code is fully compatible with corm v0.6.0 (updated in v1.0.0)
+- Benefits from corm v0.6.0 improvements:
   - Improved pointer stability (allocation reuse)
   - Automatic file loading for persistence
-  - Enhanced qmap documentation
+  - Enhanced corm documentation
 - Note: File persistence issues were resolved in v1.2.1
 
 ---
@@ -275,15 +275,15 @@ Performance remains excellent with increased limits:
 
 ### Added
 - Initial stable release
-- Interval tree implementation using qmap v0.5.0+
-- File-based persistence support via qmap
+- Interval tree implementation using corm v0.5.0+
+- File-based persistence support via corm
 - Multiple database support per file
-- Sorted iteration via QM_SORTED
+- Sorted iteration via CM_SORTED
 - BTREE secondary indexes for efficient queries (by max time, by ID)
 - ISO-8601 date string parsing and formatting utilities
 
 ### Changed
-- Migrated from libqdb to libqmap
+- Migrated from libqdb to libcorm
 - Updated from `unsigned` to `uint32_t` types throughout
-- Adopted qmap's persistent storage model
+- Adopted corm's persistent storage model
 - Reorganized headers to ttypt/ namespace

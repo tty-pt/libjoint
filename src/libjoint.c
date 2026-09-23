@@ -11,7 +11,7 @@
 #include <string.h>
 
 #include <ttypt/queue.h>
-#include <ttypt/qmap.h>
+#include <ttypt/corm.h>
 #include <ttypt/idm.h>
 #include <ttypt/qsys.h>
 #include <ttypt/rec.h>
@@ -144,7 +144,7 @@ arena_alloc(struct split_arena *a, size_t nbytes)
 }
 
 /* Ephemeral open-addressing set of entity ids (tombstone deletions),
- * replacing the per-splits_get temp qmap. key[i] stores id+1 (0 = empty);
+ * replacing the per-splits_get temp corm. key[i] stores id+1 (0 = empty);
  * del[i] marks a tombstone. Grows by doubling when live+dead occupancy
  * reaches half capacity (compacting tombstones). Lives for one endpoint
  * sweep; split_create reads the present set by scanning slots. */
@@ -339,14 +339,14 @@ tiid_cmp(const void * const a_r,
 }
 
 /******
- * qmap_assoc key callbacks
+ * corm_assoc key callbacks
  *
  * The `max` and `id` secondary maps are wired to the primary `ti` map via
- * qmap_assoc (QM_SORTED | QM_MULTIVALUE), so every qmap_put/qmap_del on the
+ * corm_assoc (CM_SORTED | CM_MULTIVALUE), so every corm_put/corm_del on the
  * primary automatically maintains both indexes — including duplicate
  * secondary keys (two intervals with the same max, or multiple intervals for
- * the same entity). qmap >= b1bc322 supports duplicate keys properly
- * (QM_MULTIVALUE; QM_RANGE iterates all duplicates — bug3).
+ * the same entity). corm >= b1bc322 supports duplicate keys properly
+ * (CM_MULTIVALUE; CM_RANGE iterates all duplicates — bug3).
  ******/
 
 /* secondary key for the max index: the interval's max timestamp */
@@ -377,36 +377,36 @@ __attribute__((constructor))
 static void
 libjoint_init(void)
 {
-	qm_ti = qmap_reg(sizeof(struct ti));
-	qm_time = qmap_reg(sizeof(time_t));
-	qm_id = qmap_reg(sizeof(uint32_t));
-	qmap_cmp_set(qm_id, tiid_cmp);
+	qm_ti = corm_reg(sizeof(struct ti));
+	qm_time = corm_reg(sizeof(time_t));
+	qm_id = corm_reg(sizeof(uint32_t));
+	corm_cmp_set(qm_id, tiid_cmp);
 }
 
 /* initialize ti dbs */
 static void
 tidbs_init(struct tidbs *dbs, char *fname)
 {
-	uint32_t flags = 0;  /* QM_MIRROR optional in qmap v0.7.0+, not needed for persistence */
+	uint32_t flags = 0;  /* CM_MIRROR optional in corm v0.7.0+, not needed for persistence */
 
 	/* Only persist the primary 'ti' database; secondary indexes are in-memory only */
-	dbs->ti = qmap_open(fname, "ti", qm_ti, qm_ti, TI_MASK, flags);
-	dbs->max = qmap_open(NULL, NULL, qm_time, qm_ti, TI_MASK, QM_SORTED | QM_MULTIVALUE);
-	dbs->id = qmap_open(NULL, NULL, qm_id, qm_ti, TI_MASK, QM_SORTED | QM_MULTIVALUE);
+	dbs->ti = corm_open(fname, "ti", qm_ti, qm_ti, TI_MASK, flags);
+	dbs->max = corm_open(NULL, NULL, qm_time, qm_ti, TI_MASK, CM_SORTED | CM_MULTIVALUE);
+	dbs->id = corm_open(NULL, NULL, qm_id, qm_ti, TI_MASK, CM_SORTED | CM_MULTIVALUE);
 
-	qmap_cmp_set(qm_time, timax_cmp);
+	corm_cmp_set(qm_time, timax_cmp);
 
-	/* Wire the secondary indexes to the primary 'ti' map via qmap_assoc:
-	 * every qmap_put/qmap_del on the primary automatically maintains both
+	/* Wire the secondary indexes to the primary 'ti' map via corm_assoc:
+	 * every corm_put/corm_del on the primary automatically maintains both
 	 * indexes (assoc_max_time_cb/assoc_id_cb pick the secondary key), and
-	 * qmap_assoc itself backfills the indexes from any entries already
+	 * corm_assoc itself backfills the indexes from any entries already
 	 * present in the primary (e.g. loaded from the file when it is
-	 * reopened). Since qmap b1bc322 duplicate secondary keys are properly
-	 * supported (QM_MULTIVALUE; QM_RANGE iterates all duplicates — bug3),
+	 * reopened). Since corm b1bc322 duplicate secondary keys are properly
+	 * supported (CM_MULTIVALUE; CM_RANGE iterates all duplicates — bug3),
 	 * so two intervals with the same max time, or multiple intervals for
 	 * the same entity, are all indexed. */
-	qmap_assoc(dbs->max, dbs->ti, assoc_max_time_cb, NULL);
-	qmap_assoc(dbs->id, dbs->ti, assoc_id_cb, NULL);
+	corm_assoc(dbs->max, dbs->ti, assoc_max_time_cb, NULL);
+	corm_assoc(dbs->id, dbs->ti, assoc_id_cb, NULL);
 }
 
 /******
@@ -418,7 +418,7 @@ static void
 ti_insert(struct tidbs *dbs, uint32_t id, time_t start, time_t end)
 {
 	struct ti ti = { .min = start, .max = end, .who = id };
-	qmap_put(dbs->ti, &ti, &ti);
+	corm_put(dbs->ti, &ti, &ti);
 }
 
 /* finish the last found interval at the provided timestamp for a certain
@@ -431,21 +431,21 @@ ti_finish_last(struct tidbs *dbs, uint32_t id, time_t end)
 	const void *key, *value;
 	/* Only scan this entity's intervals (via the id index) instead of all
 	 * intervals. The chain-based get_multi yields the same duplicate set
-	 * as the old QM_RANGE scan, without triggering a sorted-index rebuild. */
-	uint32_t c = qmap_get_multi(dbs->id, &id);
+	 * as the old CM_RANGE scan, without triggering a sorted-index rebuild. */
+	uint32_t c = corm_get_multi(dbs->id, &id);
 	int found = 0;
 
-	if (c == QM_MISS)
+	if (c == CM_MISS)
 		return;  /* No intervals for this entity at all */
 
-	while (qmap_next(&key, &value, c)) {
+	while (corm_next(&key, &value, c)) {
 		memcpy(&ti, value, sizeof(ti));
 
 		/* Find the open interval (max=tinf) for this entity */
 		if (ti.who == id && ti.max == tinf) {
 			memcpy(&old_ti, &ti, sizeof(ti));
 			found = 1;
-			qmap_fin(c);
+			corm_fin(c);
 			break;
 		}
 	}
@@ -455,10 +455,10 @@ ti_finish_last(struct tidbs *dbs, uint32_t id, time_t end)
 	}
 
 	/* Delete old interval and insert updated one */
-	qmap_del(dbs->ti, &old_ti);
+	corm_del(dbs->ti, &old_ti);
 	
 	ti.max = end;
-	qmap_put(dbs->ti, &ti, &ti);
+	corm_put(dbs->ti, &ti, &ti);
 }
 
 /* intersect an interval with an AVL of intervals */
@@ -473,11 +473,11 @@ ti_intersect(struct tidbs *dbs, struct match_arena *matches, time_t min, time_t 
 	/* Start at the first interval with max >= min (via the max index) —
 	 * a lower-bound range (all duplicate maxes included) — instead of
 	 * scanning every interval; the match predicate below is kept
-	 * identical. QM_RANGE_GE is needed because on QM_MULTIVALUE maps
-	 * plain QM_RANGE would only iterate duplicates of the exact key. */
-	uint32_t c = qmap_iter(dbs->max, &min, QM_RANGE | QM_RANGE_GE);
+	 * identical. CM_RANGE_GE is needed because on CM_MULTIVALUE maps
+	 * plain CM_RANGE would only iterate duplicates of the exact key. */
+	uint32_t c = corm_iter(dbs->max, &min, CM_RANGE | CM_RANGE_GE);
 
-	while (qmap_next(&key, &value, c)) {
+	while (corm_next(&key, &value, c)) {
 		memcpy(&tmp, value, sizeof(struct ti));
 
 		if (tmp.max >= min && tmp.min < max) {
@@ -488,7 +488,7 @@ ti_intersect(struct tidbs *dbs, struct match_arena *matches, time_t min, time_t 
 		}
 	}
 	
-	qmap_fin(c);
+	corm_fin(c);
 	return ret;
 }
 
@@ -498,15 +498,15 @@ ti_present(struct tidbs *dbs, time_t when, uint32_t who) {
 	struct ti tmp;
 	/* Only scan this entity's intervals (via the id index) instead of all
 	 * intervals; the predicate below is kept identical. The chain-based
-	 * get_multi yields the same duplicate set as the old QM_RANGE scan,
+	 * get_multi yields the same duplicate set as the old CM_RANGE scan,
 	 * without triggering a sorted-index rebuild. */
-	uint32_t c = qmap_get_multi(dbs->id, &who);
+	uint32_t c = corm_get_multi(dbs->id, &who);
 	const void *key, *value;
 
-	if (c == QM_MISS)
+	if (c == CM_MISS)
 		return ret;  /* No intervals for this entity at all */
 
-	while (qmap_next(&key, &value, c)) {
+	while (corm_next(&key, &value, c)) {
 		memcpy(&tmp, value, sizeof(struct ti));
 		
 		if (tmp.who == who && tmp.max > when && tmp.min <= when) {
@@ -515,7 +515,7 @@ ti_present(struct tidbs *dbs, time_t when, uint32_t who) {
 		}
 	}
 	
-	qmap_fin(c);
+	corm_fin(c);
 	return ret;
 }
 
@@ -752,10 +752,10 @@ joint_exists(uint32_t jd, time_t ts, uint32_t id UNUSED)
 	struct tidbs *tidbs = &ti_dbs[jd];
 	struct ti tmp;
 	int ret = 0;
-	uint32_t c = qmap_iter(tidbs->ti, NULL, 0);  // Iterate through ALL intervals
+	uint32_t c = corm_iter(tidbs->ti, NULL, 0);  // Iterate through ALL intervals
 	const void *key, *value;
 
-	while (qmap_next(&key, &value, c)) {
+	while (corm_next(&key, &value, c)) {
 		memcpy(&tmp, value, sizeof(struct ti));
 		if (tmp.max > ts && tmp.min <= ts) {
 			ret = 1;
@@ -763,7 +763,7 @@ joint_exists(uint32_t jd, time_t ts, uint32_t id UNUSED)
 		}
 	}
 	
-	qmap_fin(c);
+	corm_fin(c);
 	return ret;
 }
 
@@ -870,13 +870,13 @@ static int
 joint_has_interval(unsigned jd, uint32_t id, time_t mn, time_t mx)
 {
 	struct tidbs *tidbs = &ti_dbs[jd];
-	uint32_t c = qmap_get_multi(tidbs->id, &id);
+	uint32_t c = corm_get_multi(tidbs->id, &id);
 	const void *key, *value;
 	int found = 0;
 
-	if (c == QM_MISS)
+	if (c == CM_MISS)
 		return 0;
-	while (qmap_next(&key, &value, c)) {
+	while (corm_next(&key, &value, c)) {
 		const struct ti *t = value;
 
 		if (!t)
@@ -886,7 +886,7 @@ joint_has_interval(unsigned jd, uint32_t id, time_t mn, time_t mx)
 			break;
 		}
 	}
-	qmap_fin(c);
+	corm_fin(c);
 	return found;
 }
 
@@ -896,7 +896,7 @@ joint_erase(uint32_t jd, uint32_t id)
 	struct tidbs *tidbs = &ti_dbs[jd];
 	struct ti *tis = NULL;
 	size_t n = 0, cap = 0, i;
-	uint32_t c = qmap_get_multi(tidbs->id, &id);
+	uint32_t c = corm_get_multi(tidbs->id, &id);
 	const void *key, *value;
 
 	/* Validate entity ID - UINT32_MAX is reserved as IDM_MISS sentinel */
@@ -905,13 +905,13 @@ joint_erase(uint32_t jd, uint32_t id)
 		return -1;
 	}
 
-	if (c == QM_MISS)
+	if (c == CM_MISS)
 		return 0; /* absent: idempotent no-op */
 
 	/* Collect first: deleting through the assoc mutates the id index
 	 * while its cursor is live (the pattern ti_finish_last already
 	 * follows), so finish the cursor before any del. */
-	while (qmap_next(&key, &value, c)) {
+	while (corm_next(&key, &value, c)) {
 		if (!value)
 			continue; /* replace-created dup stub: no interval here */
 		if (n == cap) {
@@ -924,15 +924,15 @@ joint_erase(uint32_t jd, uint32_t id)
 		}
 		memcpy(&tis[n++], value, sizeof(tis[0]));
 	}
-	qmap_fin(c);
+	corm_fin(c);
 
 	for (i = 0; i < n; i++)
-		qmap_del(tidbs->ti, &tis[i]);
+		corm_del(tidbs->ti, &tis[i]);
 	free(tis);
 	/* mop up residual duplicate id-index entries (a repeated native
 	 * backfill replaces the primary key while the id index keeps
-	 * QM_MULTIVALUE dups of the same (key,value) pair) */
-	qmap_del_all(tidbs->id, &id);
+	 * CM_MULTIVALUE dups of the same (key,value) pair) */
+	corm_del_all(tidbs->id, &id);
 	return 0;
 }
 
@@ -987,12 +987,12 @@ void joint_close(unsigned jd) {
 	struct tidbs *tidbs = &ti_dbs[jd];
 	
 	/* Persist data to disk BEFORE closing (only saves file-backed maps) */
-	qmap_save();
+	corm_save();
 	
 	/* Close all databases */
-	qmap_close(tidbs->ti);
-	qmap_close(tidbs->max);
-	qmap_close(tidbs->id);
+	corm_close(tidbs->ti);
+	corm_close(tidbs->max);
+	corm_close(tidbs->id);
 	
 	idm_del(&idm, jd);
 }
@@ -1114,7 +1114,7 @@ static int joint_cli_query_parse(const char *v, const char *v_end,
 	return *a > *b ? -1 : 0;
 }
 
-/* D14 axis-contributed CLI options: the qmap CLI broadcasts inline
+/* D14 axis-contributed CLI options: the corm CLI broadcasts inline
  * `--since=…` / `--until=…` / `--query=…` to every bound axis declaring
  * them. The option struct ABI is kernel-owned in <ttypt/rec.h>. */
 const struct rec_axis_cli_option *rec_axis_cli_options(void)
@@ -1289,7 +1289,7 @@ void *rec_axis_open(const char *spec)
 
 /*
  * Phase 2A store/unstore/readback adapters (RECALL-KERNEL.md, optional
- * CLI-specific — not libqmap core API). ctx is the jd handle widened to
+ * CLI-specific — not libcorm core API). ctx is the jd handle widened to
  * a pointer via uintptr_t (same cast rec_axis_open/joint_fill use); the
  * locked contract rejects ctx == NULL, so a handle-0 store opened via
  * rec_axis_open is unreachable through these exports. spec is reserved
@@ -1405,11 +1405,11 @@ rec_axis_readback(void *ctx, rec_ref_t ref, char **blob_out, size_t *n_out)
 		return -1;
 	}
 	tidbs = &ti_dbs[jd];
-	c = qmap_get_multi(tidbs->id, &ref);
-	if (c == QM_MISS)
+	c = corm_get_multi(tidbs->id, &ref);
+	if (c == CM_MISS)
 		return 0; /* absent -> NULL/0, still 0 */
 
-	while (qmap_next(&key, &value, c)) {
+	while (corm_next(&key, &value, c)) {
 		if (!value)
 			continue; /* replace-created dup stub: no interval here */
 		if (n == cap) {
@@ -1422,7 +1422,7 @@ rec_axis_readback(void *ctx, rec_ref_t ref, char **blob_out, size_t *n_out)
 		}
 		memcpy(&tis[n++], value, sizeof(tis[0]));
 	}
-	qmap_fin(c);
+	corm_fin(c);
 	if (n == 0)
 		return 0; /* id key present but empty: treat as absent */
 

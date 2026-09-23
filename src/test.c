@@ -91,11 +91,11 @@ TEST(init_memory) {
 }
 
 TEST(init_file) {
-	const char *fname = "test_init.qmap";
+	const char *fname = "test_init.corm";
 	cleanup_db(fname);
 	
 	unsigned jd = joint_init((char *)fname);
-	/* Just verify init doesn't crash - file creation is handled by qmap */
+	/* Just verify init doesn't crash - file creation is handled by corm */
 	ASSERT(jd == jd);
 	
 	cleanup_db(fname);
@@ -260,8 +260,8 @@ TEST(multiple_entities_overlapping) {
 	ASSERT_EQ(ret3, 0);
 }
 
-/* Test for qmap association bug - stop two entities in reverse order */
-TEST(qmap_association_two_entities) {
+/* Test for corm association bug - stop two entities in reverse order */
+TEST(corm_association_two_entities) {
 	unsigned jd = joint_init(NULL);
 	
 	/* Start two entities with overlapping intervals */
@@ -277,8 +277,8 @@ TEST(qmap_association_two_entities) {
 	ASSERT_EQ(ret2, 0);
 }
 
-/* Test for qmap association bug - stop entities in different orders */
-TEST(qmap_association_reverse_order) {
+/* Test for corm association bug - stop entities in different orders */
+TEST(corm_association_reverse_order) {
 	unsigned jd = joint_init(NULL);
 	
 	/* Start 3 entities */
@@ -296,8 +296,8 @@ TEST(qmap_association_reverse_order) {
 	ASSERT_EQ(ret1, 0);
 }
 
-/* Test for qmap association bug - stop entities in mixed order */
-TEST(qmap_association_mixed_order) {
+/* Test for corm association bug - stop entities in mixed order */
+TEST(corm_association_mixed_order) {
 	unsigned jd = joint_init(NULL);
 	
 	/* Start 4 entities */
@@ -1484,9 +1484,9 @@ int main(void) {
 	printf("\n=== Category 3: Multiple Entities ===\n");
 	RUN_TEST(multiple_entities_separate);
 	RUN_TEST(multiple_entities_overlapping);
-	RUN_TEST(qmap_association_two_entities);
-	RUN_TEST(qmap_association_reverse_order);
-	RUN_TEST(qmap_association_mixed_order);
+	RUN_TEST(corm_association_two_entities);
+	RUN_TEST(corm_association_reverse_order);
+	RUN_TEST(corm_association_mixed_order);
 	RUN_TEST(multiple_entities_nonoverlapping);
 	RUN_TEST(same_entity_multiple_intervals);
 	RUN_TEST(interleaved_operations);
