@@ -3,8 +3,8 @@ exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include
 
-Name: itlib
+Name: joint
 Description: Easy interval tree library
 Version: 1.1.0
-Libs: -lit -lqmap -lqsys
+Libs: -ljoint -lcorm -lqsys
 Cflags:

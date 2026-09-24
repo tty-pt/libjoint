@@ -1,6 +1,6 @@
-# libit Testing Summary
+# libjoint Testing Summary
 
-This document summarizes the comprehensive testing effort for libit across all versions.
+This document summarizes the comprehensive testing effort for libjoint across all versions.
 
 ## Latest: v1.2.1 (February 2026)
 
@@ -14,7 +14,7 @@ This document summarizes the comprehensive testing effort for libit across all v
 ### What Changed in v1.2.1
 
 **Code Changes:**
-- Removed QM_MIRROR flag from it_init() (qmap v0.7.0+ change)
+- Removed CM_MIRROR flag from joint_init() (corm v0.7.0+ change)
 - Re-enabled Category 7 persistence tests (5 tests)
 - File persistence now works!
 
@@ -50,7 +50,7 @@ This document summarizes the comprehensive testing effort for libit across all v
 | 4: Intersection Queries | 8 | ✅ PASS | No changes |
 | 5: Split Computation | 8 | ✅ PASS | No changes |
 | 6: Time Utilities | 6 | ✅ PASS | No changes |
-| 7: Persistence | 0 | 🚫 DISABLED | Still failing (qmap b1bc322) |
+| 7: Persistence | 0 | 🚫 DISABLED | Still failing (corm b1bc322) |
 | 8: Input Validation | 4 | ✅ **NEW** | Timestamp + entity ID validation |
 | **Core Total** | **50** | **50✅ 0❌** | **+ 4 validation tests** |
 
@@ -108,13 +108,13 @@ Performance remains excellent despite 32x capacity increase.
 ### Known Issues (v1.2.1)
 
 **All Fixed in v1.2.1:**
-- ✅ File persistence: NOW WORKING (removed QM_MIRROR)
+- ✅ File persistence: NOW WORKING (removed CM_MIRROR)
 - ❌ Zero-duration intervals (by design)
 
 **Persistence Test Results (v1.2.1):**
-- Removed QM_MIRROR flag (qmap v0.7.0+ no longer requires it)
+- Removed CM_MIRROR flag (corm v0.7.0+ no longer requires it)
 - All 5 persistence tests passing
-- See QMAP_PERSISTENCE_BUGS.md for resolution details
+- See CORM_PERSISTENCE_BUGS.md for resolution details
 
 ---
 
@@ -122,12 +122,12 @@ Performance remains excellent despite 32x capacity increase.
 
 ### Overview
 
-- **Project**: libit (Interval Tree Library)
+- **Project**: libjoint (Interval Tree Library)
 - **Version**: v1.1.0
 - **Testing Period**: February 2026 (Phases 1-4)
 - **Total Tests**: 62 automated tests + 5 persistence tests (disabled)
 - **Test Framework**: Custom macros (TEST, ASSERT, PASS, FAIL)
-- **Methodology**: Modeled after qmap v0.6.0 testing approach
+- **Methodology**: Modeled after corm v0.6.0 testing approach
 
 ## Test Statistics
 
@@ -205,13 +205,13 @@ Performance remains excellent despite 32x capacity increase.
 - ✅ Test 50: printtime() round-trip consistency
 
 #### Category 7: Persistence (5 tests) - 🚫 DISABLED
-- 🚫 Test 51: Save and reload single interval (qmap bug #1)
-- 🚫 Test 52: Save and reload multiple intervals (qmap bug #1)
-- 🚫 Test 53: Append to existing file (qmap bug #1)
-- 🚫 Test 54: Multiple databases in one file (qmap bug #1)
-- 🚫 Test 55: it_close() cleanup (qmap bug #2 - crash)
+- 🚫 Test 51: Save and reload single interval (corm bug #1)
+- 🚫 Test 52: Save and reload multiple intervals (corm bug #1)
+- 🚫 Test 53: Append to existing file (corm bug #1)
+- 🚫 Test 54: Multiple databases in one file (corm bug #1)
+- 🚫 Test 55: joint_close() cleanup (corm bug #2 - crash)
 
-**Note**: Category 7 tests implemented but disabled due to critical qmap v0.6.0 bugs (see QMAP_PERSISTENCE_BUGS.md)
+**Note**: Category 7 tests implemented but disabled due to critical corm v0.6.0 bugs (see CORM_PERSISTENCE_BUGS.md)
 
 #### Category 8: Extended Tests (12 tests) - Phase 4
 - ✅ Test 56: Large dataset stress (2000 intervals, 77.78 µs/interval)
@@ -232,31 +232,31 @@ Performance remains excellent despite 32x capacity increase.
 ## Bugs Discovered and Fixed
 
 ### Critical Bugs (Phase 2)
-1. **Memory leak in ti_intersect()** - Missing `qmap_fin()` call
-   - Location: `src/libit.c:247`
-   - Fix: Added `qmap_fin(c)` after while loop
+1. **Memory leak in ti_intersect()** - Missing `corm_fin()` call
+   - Location: `src/libjoint.c:247`
+   - Fix: Added `corm_fin(c)` after while loop
    - Impact: Memory leak on every query operation
 
-2. **Memory leak in split_create()** - Missing `qmap_fin()` call  
-   - Location: `src/libit.c:369`
-   - Fix: Added `qmap_fin(c)` after entity iteration
+2. **Memory leak in split_create()** - Missing `corm_fin()` call  
+   - Location: `src/libjoint.c:369`
+   - Fix: Added `corm_fin(c)` after entity iteration
    - Impact: Memory leak during split computation
 
 3. **Integer underflow in splits_create()** - Infinite loop when matches_l=0
-   - Location: `src/libit.c:389`
+   - Location: `src/libjoint.c:389`
    - Code: `for (i = 0; i < matches_l * 2 - 1; i++)`
    - Fix: Guard against zero matches in splits_get()
    - Impact: Crash/corruption when querying empty ranges
 
 ### Time Utility Bugs (Phase 3)
 4. **sscantime() errno false positive**
-   - Location: `src/libit.c:87`
+   - Location: `src/libjoint.c:87`
    - Issue: errno not reset before strtoull(), causing false errors
    - Fix: Added `errno = 0;` before strtoull()
    - Impact: Valid timestamps rejected incorrectly
 
 5. **printtime() missing return statements**
-   - Location: `src/libit.c:106, 111`
+   - Location: `src/libjoint.c:106, 111`
    - Issue: Undefined behavior after setting "-inf"/"inf"
    - Fix: Added explicit `return` statements
    - Impact: Potential crashes on extreme timestamps
@@ -266,15 +266,15 @@ Performance remains excellent despite 32x capacity increase.
 Five critical design limitations were discovered and documented:
 
 1. **TI_MASK Limit**: Maximum ~2048 intervals per database
-   - Root cause: `TI_MASK=0x7FF` in src/libit.c:28
+   - Root cause: `TI_MASK=0x7FF` in src/libjoint.c:28
    - Test evidence: 10,000 intervals → only 2,048 returned
 
 2. **SPLITS_WHO_MASK Limit**: Maximum 256 entities per split interval
-   - Root cause: `SPLITS_WHO_MASK=0xFF` in src/libit.c:27
+   - Root cause: `SPLITS_WHO_MASK=0xFF` in src/libjoint.c:27
    - Test evidence: 1,000 overlapping entities → only 256 returned
 
 3. **Extreme Timestamp Overflow**: Near INT64_MAX values not supported
-   - Root cause: Arithmetic overflow in qmap/libit
+   - Root cause: Arithmetic overflow in corm/libjoint
    - Test evidence: timestamp=9.2e18 → not queryable
 
 4. **UINT32_MAX Entity ID Conflict**: ID 4,294,967,295 unusable
@@ -285,24 +285,24 @@ Five critical design limitations were discovered and documented:
    - Root cause: Half-open interval semantics [min, max)
    - Test evidence: Interval [T,T) is mathematically empty
 
-See `LIBIT_LIMITATIONS.md` for detailed documentation.
+See `JOINT_LIMITATIONS.md` for detailed documentation.
 
 ## External Dependencies Bugs (Phase 3)
 
-### qmap v0.6.0 Persistence Bugs
-Two critical bugs in qmap prevent file persistence from working:
+### corm v0.6.0 Persistence Bugs
+Two critical bugs in corm prevent file persistence from working:
 
-**Bug #1: Multiple databases with QM_MIRROR fail to persist**
+**Bug #1: Multiple databases with CM_MIRROR fail to persist**
 - Symptoms: Data not saved to disk, queries return empty after reload
-- Impact: All 3 libit databases (ti, max, id) fail to persist
+- Impact: All 3 libjoint databases (ti, max, id) fail to persist
 - Workaround: None (blocking issue)
 
-**Bug #2: Process exit crash with QM_MIRROR and custom types**
-- Symptoms: "free(): invalid pointer" crash during qmap_close()
-- Impact: Cannot cleanly close libit databases
+**Bug #2: Process exit crash with CM_MIRROR and custom types**
+- Symptoms: "free(): invalid pointer" crash during corm_close()
+- Impact: Cannot cleanly close libjoint databases
 - Workaround: None (blocking issue)
 
-See `QMAP_PERSISTENCE_BUGS.md` for detailed investigation and reproduction steps.
+See `CORM_PERSISTENCE_BUGS.md` for detailed investigation and reproduction steps.
 
 ## Test Infrastructure
 
@@ -364,8 +364,8 @@ All timings from test_extended on development machine:
 
 ### Phase 3: Time Utilities and Persistence (Commit 0183e3e)
 - **Goal**: Test time functions and file persistence
-- **Approach**: Implement Categories 6-7, investigate qmap bugs
-- **Result**: 6 tests passing, 5 disabled, 2 bugs fixed, qmap bugs documented
+- **Approach**: Implement Categories 6-7, investigate corm bugs
+- **Result**: 6 tests passing, 5 disabled, 2 bugs fixed, corm bugs documented
 
 ### Phase 4: Extended Testing (Commit 78ef051)
 - **Goal**: Stress testing, performance benchmarks, edge cases
@@ -375,7 +375,7 @@ All timings from test_extended on development machine:
 ### Testing Principles
 1. **No Valgrind**: Per user requirements, no memory leak detection via Valgrind
 2. **Deterministic + Random**: Mix of fixed and random test data
-3. **qmap Patterns**: Follow qmap v0.6.0 testing structure and style
+3. **corm Patterns**: Follow corm v0.6.0 testing structure and style
 4. **Visual Clarity**: ✅/❌ indicators for easy result scanning
 5. **Performance Focus**: Include timing metrics and benchmarks
 
@@ -383,14 +383,14 @@ All timings from test_extended on development machine:
 
 ### Created Documents
 1. **CHANGELOG.md** (68 lines): Version history and changes
-2. **QMAP_PERSISTENCE_BUGS.md** (174 lines): qmap bug investigation
-3. **LIBIT_LIMITATIONS.md** (440 lines): Design limitations reference
+2. **CORM_PERSISTENCE_BUGS.md** (174 lines): corm bug investigation
+3. **JOINT_LIMITATIONS.md** (440 lines): Design limitations reference
 4. **TESTING_SUMMARY.md** (this file): Complete testing overview
 
 ### API Documentation
-- Enhanced `include/ttypt/it.h` with comprehensive Doxygen comments
+- Enhanced `include/ttypt/joint.h` with comprehensive Doxygen comments
 - Documented all functions with parameters, return values, examples
-- Added it_close() documentation for future persistence support
+- Added joint_close() documentation for future persistence support
 
 ### Test Documentation
 - Inline comments in test.c explaining test scenarios
@@ -412,9 +412,9 @@ All timings from test_extended on development machine:
 ## Known Issues
 
 ### Blocking Issues
-1. **File persistence not working** (qmap bugs #1 and #2)
+1. **File persistence not working** (corm bugs #1 and #2)
    - Category 7 tests disabled
-   - it_close() ineffective
+   - joint_close() ineffective
    - Workaround: None available
 
 ### Design Limitations
@@ -435,7 +435,7 @@ All timings from test_extended on development machine:
 ✅ **Bug fixes**: 5 critical bugs discovered and fixed
 ✅ **Performance benchmarks**: Detailed timing metrics for all operations
 ✅ **Deterministic + random data**: Both types of test data included
-✅ **qmap patterns followed**: Structure mirrors qmap v0.6.0 testing
+✅ **corm patterns followed**: Structure mirrors corm v0.6.0 testing
 ✅ **No Valgrind**: Per user requirements
 ✅ **Documentation**: 4 comprehensive docs totaling 1122 lines
 ✅ **Integration testing**: test.sh with expects.txt diffing
@@ -453,7 +453,7 @@ All timings from test_extended on development machine:
 
 ### For Future Releases
 1. Make TI_MASK and SPLITS_WHO_MASK configurable at runtime
-2. Add it_get_limits() API function to query current mask values
+2. Add joint_get_limits() API function to query current mask values
 3. Consider supporting zero-duration intervals
 
 ### For Library Users
@@ -465,20 +465,20 @@ All timings from test_extended on development machine:
 
 ## Conclusion
 
-The libit v1.1.0 testing effort successfully:
+The libjoint v1.1.0 testing effort successfully:
 - Created 62 comprehensive automated tests
 - Discovered and fixed 5 critical bugs
 - Identified 5 design limitations with workarounds
-- Documented 2 blocking qmap bugs
+- Documented 2 blocking corm bugs
 - Established performance baselines
 - Provided complete documentation
 
-The library is **production-ready for in-memory use** with documented limitations. File persistence support awaits qmap bug fixes.
+The library is **production-ready for in-memory use** with documented limitations. File persistence support awaits corm bug fixes.
 
 ---
 
 **Testing completed**: February 23, 2026  
-**Library version**: libit v1.1.0  
+**Library version**: libjoint v1.1.0  
 **Test suite version**: Phase 4 complete  
 **Total test coverage**: 62 passing + 5 disabled = 67 tests  
 **Documentation**: 1122 lines across 4 files  

@@ -1,19 +1,85 @@
 # Changelog
 
-All notable changes to libit will be documented in this file.
+All notable changes to libjoint will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## 1.3.0
+
+- **Renamed `libit` → `libjoint`**: the `it_*` API is now `joint_*` (`include/ttypt/joint.h`, `it.pc` → `joint.pc`; `LIBIT_LIMITATIONS.md` → `JOINT_LIMITATIONS.md`). Renames span the whole walker/splitter read model while the interval-tree semantics stay intact.
+- **Kernel composition**: new `rec_axis_*` adapters (`rec_axis_fill_interval`, `rec_axis_open`, plus `rec_axis_store`/`rec_axis_unstore`/`rec_axis_readback`) plug joint's interval/overlap matching straight into the recall kernel with `rec_ref_t` (`uint32_t`) refs; all axis parameters are CLI parameters.
+- **Sweep-line performance tiers**: public API unchanged; all work is in the query/split path (`joint_iter` → `joint_next`) — `-O3 -mpopcnt -mavx2 -mfma` build (was `-O0`), pointer-cast split compares (no 16-byte `memcpy` per comparison), a query-level `match_arena` replacing per-match mallocs, a block-list `split_arena` replacing per-split mallocs, and an ephemeral `who_set` (open addressing) replacing the per-gap temp corm. Query benchmarks: 1k overlap query 48.5×, 3k overlap query 48×, 1000 insert/query cycles 6.8×, sparse query 6.2×, splits(100) 5.5× faster (medians; `make bench`).
+- **Bug fixes**: two latent signed-integer overflows in `src/test_extended.c` exposed by UBSan (`int` overflow in timestamp arithmetic, `int64` overflow in query-end) — both corrected to `time_t`/`huge` arithmetic.
+- `libqmap` → `libcorm` rename.
+
+### Performance (medians, µs; `make bench` on one loaded box)
+
+Baseline = pristine `-O0` build (medians of 3); optimized = this tree
+(medians of 9). Same machine, same load window.
+
+| Bench | Baseline | Now | × |
+|---|---|---|---|
+| 10k insert | 35 734 | 16 137 | 2.2 |
+| query-all (10k) | 3 673 044 | 1 601 764 | 2.3 |
+| 1k overlap insert | 9 234 | 5 258 | 1.8 |
+| 1k overlap query | 5 444 | 326 | 16.7 |
+| sequential 5k | 2 267 215 | 1 287 717 | 1.8 |
+| sparse query | 81 | 13 | 6.2 |
+| splits (100 ent) | 343 | 62 | 5.5 |
+| 1000 insert/query cycles | 180 756 539 | 26 737 804 | 6.8 |
+| 15k insert | 45 691 | 21 613 | 2.1 |
+| 15k range query | 2 034 606 | 997 656 | 2.0 |
+| 3k overlap insert | 52 867 | 30 614 | 1.7 |
+| 3k overlap query | 62 079 | 1 281 | 48.5 |
+| 20k insert | 93 440 | 33 995 | 2.7 |
+| 20k range query | 1 683 350 | 801 620 | 2.1 |
+
+Absolute numbers swing 2–5× with machine load (both columns measured in
+the same window, so ratios are like-for-like). All 74 tests pass
+(`./test.sh`); ASan+UBSan clean (manual build, `detect_leaks=0` — the
+iterator arena is intentionally never freed; no teardown API exists, as
+before). Valgrind out of scope per project policy.
+
+## [1.2.2] - 2026-09-10
+
+### Fixed — W3 index-read efficiency regression
+
+- Equality reads (`ti_present`, `ti_finish_last`) now use
+  `corm_get_multi()` instead of `corm_iter(…, CM_RANGE)`: the same
+  duplicate-set iteration but O(k) per key (chain walk) with no
+  full-table unsorted-to-sorted rebuild of the MV indexes.
+  libcorm ≥ 0.8.0 (chains) / ≥ 0.8.0-backshift (no-holes) required;
+  compat floors otherwise unchanged (≥ `1a4bfa2` auto-grow,
+  ≥ `b1bc322` assoc-multivalue).
+- No public `joint_*` behavior changed; `ti_intersect` GE scans on `max`
+  unchanged.
+
+### Performance (vs pre-W3 baseline, new libcorm)
+
+| Bench | Baseline | Now |
+|---|---|---|
+| 10k start+stop | 2 499 442 µs | **14 297 µs** |
+| query-all | 1 833 316 µs | **872 228 µs** |
+| sequential | 579 107 µs | **573 451 µs** |
+| interleave | 12 981 µs | **998 µs** |
+| 15k insert | 5 928 149 µs | **17 749 µs** |
+| 20k insert | 9 131 138 µs | **18 124 µs** |
+| 1000-cycle | 100 342 259 µs | **71 072 518 µs** |
+
+**Test count:** still 74 (59 core + 15 extended), all passing.
+
+---
 
 ## [1.2.1] - 2026-02-23
 
 ### Fixed - File Persistence
 
 **File Persistence Now Works** ✅
-- Removed QM_MIRROR flag from `it_init()` (src/libit.c:166)
-- **Root cause:** qmap v0.7.0+ no longer requires QM_MIRROR for file persistence
-- **Solution:** Changed flags from `QM_MIRROR` to `0`
-- **Why it works:** libit doesn't need bidirectional lookups (qmap_assoc), so QM_MIRROR was unnecessary
+- Removed CM_MIRROR flag from `joint_init()` (src/libjoint.c:166)
+- **Root cause:** corm v0.7.0+ no longer requires CM_MIRROR for file persistence
+- **Solution:** Changed flags from `CM_MIRROR` to `0`
+- **Why it works:** libjoint doesn't need bidirectional lookups (corm_assoc), so CM_MIRROR was unnecessary
 
 **Test Results:**
 - All 5 Category 7 persistence tests now passing:
@@ -26,8 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Total Test Count:** 74 tests (59 core + 15 extended)
 
 ### Documentation Updated
-- LIBIT_LIMITATIONS.md: Added section 5 for persistence fix
-- QMAP_PERSISTENCE_BUGS.md: Marked as resolved
+- JOINT_LIMITATIONS.md: Added section 5 for persistence fix
+- CORM_PERSISTENCE_BUGS.md: Marked as resolved
 
 ---
 
@@ -36,21 +102,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed - Design Limitations Addressed
 
 **TI_MASK Limit (Fixed)**
-- Increased from `0x7FF` to `0xFFFF` (src/libit.c:28)
+- Increased from `0x7FF` to `0xFFFF` (src/libjoint.c:28)
 - **Old limit:** ~2,048 intervals per database
 - **New limit:** 65,536 intervals per database  
 - **Increase:** 32x capacity
 - Test coverage: 10k, 15k, and 20k interval tests passing
 
 **SPLITS_WHO_MASK Limit (Fixed)**
-- Increased from `0xFF` to `0xFFF` (src/libit.c:27)
+- Increased from `0xFF` to `0xFFF` (src/libjoint.c:27)
 - **Old limit:** 256 entities per split interval
 - **New limit:** 4,096 entities per split interval
 - **Increase:** 16x capacity
 - Test coverage: 1k and 3k overlapping entity tests passing
 
 **Extreme Timestamps (Fixed)**
-- Added input validation to `it_start()` and `it_stop()`
+- Added input validation to `joint_start()` and `joint_stop()`
 - **Valid range:** `[LONG_MIN/2, LONG_MAX/2]`
 - **Behavior:** Returns -1 with `errno = ERANGE` for out-of-range timestamps
 - **Rationale:** Prevents conflicts with internal sentinel values (mtinf, tinf)
@@ -65,7 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed - API Behavior
 
-**it_start() and it_stop() Return Values**
+**joint_start() and joint_stop() Return Values**
 - **Previous:** 0=success, 1=duplicate/no-interval
 - **New:** 0=success, 1=duplicate/no-interval, -1=validation error
 - **Error reporting:** Check `errno` when return value is -1
@@ -75,10 +141,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 **Category 8: Input Validation Tests** (4 new tests)
-- test_validation_extreme_timestamp_start: Validates timestamp range in it_start()
-- test_validation_extreme_timestamp_stop: Validates timestamp range in it_stop()
-- test_validation_uint32_max_start: Validates entity ID in it_start()
-- test_validation_uint32_max_stop: Validates entity ID in it_stop()
+- test_validation_extreme_timestamp_start: Validates timestamp range in joint_start()
+- test_validation_extreme_timestamp_stop: Validates timestamp range in joint_stop()
+- test_validation_uint32_max_start: Validates entity ID in joint_start()
+- test_validation_uint32_max_stop: Validates entity ID in joint_stop()
 
 **Extended Test Suite Enhancements** (3 new boundary tests)
 - Test 13: 15,000 intervals (approaching 65k limit)
@@ -93,10 +159,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated Documentation
 
-- **LIBIT_LIMITATIONS.md**: Marked 4 limitations as FIXED, reorganized by status
+- **JOINT_LIMITATIONS.md**: Marked 4 limitations as FIXED, reorganized by status
 - **QUICK_REFERENCE.md**: Updated limits table and error handling examples
 - **TESTING_SUMMARY.md**: Added v1.2.0 fixes section
-- **it.h**: Updated API documentation for it_start() and it_stop() with new return codes
+- **joint.h**: Updated API documentation for joint_start() and joint_stop() with new return codes
 
 ### Known Issues
 
@@ -106,10 +172,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Workaround: Use minimum duration of 1 time unit
 
 **Persistence Tests (Still Failing)**
-- Re-tested with qmap b1bc322 (includes df5a7ac file loading fix)
+- Re-tested with corm b1bc322 (includes df5a7ac file loading fix)
 - Result: Segmentation fault - bugs still present
-- Category 7 tests remain disabled pending upstream qmap fixes
-- See QMAP_PERSISTENCE_BUGS.md for updated test results
+- Category 7 tests remain disabled pending upstream corm fixes
+- See CORM_PERSISTENCE_BUGS.md for updated test results
 
 ### Performance
 
@@ -121,26 +187,26 @@ Performance remains excellent with increased limits:
 
 ### Compatibility
 
-- **qmap version:** b1bc322+ (tested with b1bc322)
+- **corm version:** b1bc322+ (tested with b1bc322)
 - **Breaking changes:** None - backward compatible API
 - **New behavior:** Validation errors return -1 (previously would silently fail or corrupt data)
 
 ## [1.1.0] - 2026-02-23
 
 ### Changed
-- Align project structure with qmap v0.6.0 patterns
-- Update .gitignore with build artifact and test file patterns (/bin, /*.db, /*.qmap, /man)
+- Align project structure with corm v0.6.0 patterns
+- Update .gitignore with build artifact and test file patterns (/bin, /*.db, /*.corm, /man)
 - Add Doxygen support for automatic man page generation
-- Enhance API documentation in it.h with comprehensive Doxygen comments
-- Update dependencies in it.pc (libqmap, libqsys instead of libqdb, libdb)
+- Enhance API documentation in joint.h with comprehensive Doxygen comments
+- Update dependencies in joint.pc (libcorm, libqsys instead of libqdb, libdb)
 - Establish CHANGELOG for version tracking
 
 ### Fixed
-- Fixed missing qmap_fin() calls in ti_intersect() and split_create() causing memory leaks (Phase 2)
+- Fixed missing corm_fin() calls in ti_intersect() and split_create() causing memory leaks (Phase 2)
 - Fixed integer underflow bug in splits_create() when matches_l=0 causing infinite loop and corruption (Phase 2)
 - Added proper empty result handling in splits_get() for query ranges with no matches (Phase 2)
-- Fixed errno not being reset in sscantime() before strtoull() call, causing false positives (Phase 3 - src/libit.c:87)
-- Fixed printtime() missing return statements after setting "-inf"/"inf", preventing crashes on extreme timestamps (Phase 3 - src/libit.c:106, 111)
+- Fixed errno not being reset in sscantime() before strtoull() call, causing false positives (Phase 3 - src/libjoint.c:87)
+- Fixed printtime() missing return statements after setting "-inf"/"inf", preventing crashes on extreme timestamps (Phase 3 - src/libjoint.c:106, 111)
 
 ### Added
 - Comprehensive test suite (Phases 1, 2, 3 & 4):
@@ -150,7 +216,7 @@ Performance remains excellent with increased limits:
   - Category 4: Intersection query tests (8 tests)
   - Category 5: Split computation tests (8 tests)
   - Category 6: Time utilities tests (6 tests - sscantime, printtime)
-  - Category 7: Persistence tests (5 tests - DISABLED due to qmap bugs)
+  - Category 7: Persistence tests (5 tests - DISABLED due to corm bugs)
   - **Category 8: Extended tests** (12 tests - stress, performance, edge cases):
     - Test 1: Large dataset stress test (2000 intervals)
     - Test 2: Many overlapping intervals (250 entities)
@@ -168,14 +234,14 @@ Performance remains excellent with increased limits:
 - test_extended binary with performance metrics (microsecond timing, throughput reporting)
 - Integration test script (test.sh) with regression testing via expects.txt
 - Test output formatting with ✅/❌ indicators for easy visual verification
-- Added it_close() function for future persistence support (currently no-op for in-memory databases)
+- Added joint_close() function for future persistence support (currently no-op for in-memory databases)
 
 ### Notes
-- Code is fully compatible with qmap v0.6.0 (updated in v1.0.0)
-- Benefits from qmap v0.6.0 improvements:
+- Code is fully compatible with corm v0.6.0 (updated in v1.0.0)
+- Benefits from corm v0.6.0 improvements:
   - Improved pointer stability (allocation reuse)
   - Automatic file loading for persistence
-  - Enhanced qmap documentation
+  - Enhanced corm documentation
 - Note: File persistence issues were resolved in v1.2.1
 
 ---
@@ -185,15 +251,15 @@ Performance remains excellent with increased limits:
 
 ### Added
 - Initial stable release
-- Interval tree implementation using qmap v0.5.0+
-- File-based persistence support via qmap
+- Interval tree implementation using corm v0.5.0+
+- File-based persistence support via corm
 - Multiple database support per file
-- Sorted iteration via QM_SORTED
+- Sorted iteration via CM_SORTED
 - BTREE secondary indexes for efficient queries (by max time, by ID)
 - ISO-8601 date string parsing and formatting utilities
 
 ### Changed
-- Migrated from libqdb to libqmap
+- Migrated from libqdb to libcorm
 - Updated from `unsigned` to `uint32_t` types throughout
-- Adopted qmap's persistent storage model
+- Adopted corm's persistent storage model
 - Reorganized headers to ttypt/ namespace

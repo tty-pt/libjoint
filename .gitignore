@@ -1,6 +1,7 @@
 /lib
-/src/*.o
 /bin
 /*.db
 /*.qmap
 /man
+*.o
+*.d

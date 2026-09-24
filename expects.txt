@@ -1,4 +1,4 @@
-Running libit tests...
+Running libjoint tests...
 
 === Category 1: Basic Initialization ===
 test_init_memory ✅ 
@@ -20,9 +20,9 @@ test_backward_interval ✅
 === Category 3: Multiple Entities ===
 test_multiple_entities_separate ✅ ✅ ✅ 
 test_multiple_entities_overlapping ✅ ✅ ✅ 
-test_qmap_association_two_entities ✅ ✅ 
-test_qmap_association_reverse_order ✅ ✅ ✅ 
-test_qmap_association_mixed_order ✅ ✅ ✅ ✅ 
+test_corm_association_two_entities ✅ ✅ 
+test_corm_association_reverse_order ✅ ✅ ✅ 
+test_corm_association_mixed_order ✅ ✅ ✅ ✅ 
 test_multiple_entities_nonoverlapping ✅ 
 test_same_entity_multiple_intervals ✅ 
 test_interleaved_operations ✅ 
@@ -70,6 +70,17 @@ test_validation_extreme_timestamp_start ✅ ✅
 test_validation_extreme_timestamp_stop ✅ ✅ 
 test_validation_uint32_max_start ✅ ✅ 
 test_validation_uint32_max_stop ✅ ✅ 
+
+=== Category 9: rec_query joint axis registration ===
+test_rec_axis_fill_interval_matches_manual_walk ✅ ✅ ✅ ✅ ✅ 
+test_rec_axis_fill_interval_null_out ✅ 
+test_rec_axis_joint_registered ✅ ✅ ✅ ✅ ✅ 
+test_rec_axis_joint_decode_and_fill ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ 
+test_rec_axis_joint_decode_dates ✅ ✅ ✅ ✅ 
+test_rec_axis_joint_decode_rejects_garbage ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ 
+test_rec_axis_joint_cli_options ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ 
+test_rec_axis_joint_cli_query ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ 
+test_rec_axis_joint_open ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ ✅ 
 
 === Test Summary ===
 Total errors: 0

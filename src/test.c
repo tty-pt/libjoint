@@ -1,4 +1,4 @@
-#include "./../include/ttypt/it.h"
+#include "./../include/ttypt/joint.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -10,6 +10,10 @@
 #include <stdint.h>
 
 #include <ttypt/qsys.h>
+#include <ttypt/rec.h>
+
+extern const struct rec_axis_cli_option *rec_axis_cli_options(void);
+extern int rec_axis_config_arg(const char *name, const char *value);
 
 char *good = "✅";
 char *bad = "❌";
@@ -81,26 +85,26 @@ static void cleanup_db(const char *fname) {
  * ============================================ */
 
 TEST(init_memory) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	/* ID starts from 0, so just check that init succeeded */
-	ASSERT(itd == itd); /* Always true, just verifying it doesn't crash */
+	ASSERT(jd == jd); /* Always true, just verifying it doesn't crash */
 }
 
 TEST(init_file) {
-	const char *fname = "test_init.qmap";
+	const char *fname = "test_init.corm";
 	cleanup_db(fname);
 	
-	unsigned itd = it_init((char *)fname);
-	/* Just verify init doesn't crash - file creation is handled by qmap */
-	ASSERT(itd == itd);
+	unsigned jd = joint_init((char *)fname);
+	/* Just verify init doesn't crash - file creation is handled by corm */
+	ASSERT(jd == jd);
 	
 	cleanup_db(fname);
 }
 
 TEST(init_multiple) {
-	unsigned itd1 = it_init(NULL);
-	unsigned itd2 = it_init(NULL);
-	unsigned itd3 = it_init(NULL);
+	unsigned itd1 = joint_init(NULL);
+	unsigned itd2 = joint_init(NULL);
+	unsigned itd3 = joint_init(NULL);
 	
 	/* Just verify each init works and returns different IDs */
 	ASSERT(itd1 != itd2);
@@ -112,33 +116,33 @@ TEST(init_multiple) {
  * ============================================ */
 
 TEST(start_single) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	time_t t1 = 1000;
 	unsigned id = 1;
 	
-	int ret = it_start(itd, t1, id);
+	int ret = joint_start(jd, t1, id);
 	ASSERT_EQ(ret, 0);
 }
 
 TEST(stop_single) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	time_t t1 = 1000;
 	time_t t2 = 2000;
 	unsigned id = 1;
 	
-	it_start(itd, t1, id);
-	int ret = it_stop(itd, t2, id);
+	joint_start(jd, t1, id);
+	int ret = joint_stop(jd, t2, id);
 	ASSERT_EQ(ret, 0);
 }
 
 TEST(start_stop_sequence) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	unsigned id = 1;
 	
-	int ret1 = it_start(itd, 1000, id);
-	int ret2 = it_stop(itd, 2000, id);
-	int ret3 = it_start(itd, 3000, id);
-	int ret4 = it_stop(itd, 4000, id);
+	int ret1 = joint_start(jd, 1000, id);
+	int ret2 = joint_stop(jd, 2000, id);
+	int ret3 = joint_start(jd, 3000, id);
+	int ret4 = joint_stop(jd, 4000, id);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
@@ -147,79 +151,79 @@ TEST(start_stop_sequence) {
 }
 
 TEST(duplicate_start) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	time_t t1 = 1000;
 	unsigned id = 1;
 	
-	int ret1 = it_start(itd, t1, id);
-	int ret2 = it_start(itd, t1, id);
+	int ret1 = joint_start(jd, t1, id);
+	int ret2 = joint_start(jd, t1, id);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 1); /* Should return 1 for duplicate */
 }
 
 TEST(stop_without_start) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	time_t t1 = 1000;
 	unsigned id = 1;
 	
 	/* Stop without start creates interval from -infinity */
-	int ret = it_stop(itd, t1, id);
+	int ret = joint_stop(jd, t1, id);
 	ASSERT_EQ(ret, 1); /* Should return 1 for no open interval */
 }
 
 TEST(start_stop_same_time) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	time_t t = 1000;
 	unsigned id = 1;
 	
-	int ret1 = it_start(itd, t, id);
-	int ret2 = it_stop(itd, t, id);
+	int ret1 = joint_start(jd, t, id);
+	int ret2 = joint_stop(jd, t, id);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
 }
 
 TEST(zero_timestamp) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	unsigned id = 1;
 	
-	int ret1 = it_start(itd, 0, id);
-	int ret2 = it_stop(itd, 1000, id);
+	int ret1 = joint_start(jd, 0, id);
+	int ret2 = joint_stop(jd, 1000, id);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
 }
 
 TEST(negative_timestamp) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	unsigned id = 1;
 	
-	int ret1 = it_start(itd, -1000, id);
-	int ret2 = it_stop(itd, 1000, id);
+	int ret1 = joint_start(jd, -1000, id);
+	int ret2 = joint_stop(jd, 1000, id);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
 }
 
 TEST(large_timestamp) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	unsigned id = 1;
 	time_t large = 2147483647; /* Max 32-bit signed int */
 	
-	int ret1 = it_start(itd, 0, id);
-	int ret2 = it_stop(itd, large, id);
+	int ret1 = joint_start(jd, 0, id);
+	int ret2 = joint_stop(jd, large, id);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
 }
 
 TEST(backward_interval) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	unsigned id = 1;
 	
 	/* Stop before start - should create backward interval */
-	int ret1 = it_stop(itd, 1000, id);
+	int ret1 = joint_stop(jd, 1000, id);
 	
 	ASSERT_EQ(ret1, 1);
 }
@@ -229,11 +233,11 @@ TEST(backward_interval) {
  * ============================================ */
 
 TEST(multiple_entities_separate) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
-	int ret1 = it_start(itd, 1000, 1);
-	int ret2 = it_start(itd, 1000, 2);
-	int ret3 = it_start(itd, 1000, 3);
+	int ret1 = joint_start(jd, 1000, 1);
+	int ret2 = joint_start(jd, 1000, 2);
+	int ret3 = joint_start(jd, 1000, 3);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
@@ -241,72 +245,72 @@ TEST(multiple_entities_separate) {
 }
 
 TEST(multiple_entities_overlapping) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
-	it_start(itd, 1000, 1);
-	it_start(itd, 1500, 2);
-	it_start(itd, 2000, 3);
+	joint_start(jd, 1000, 1);
+	joint_start(jd, 1500, 2);
+	joint_start(jd, 2000, 3);
 	
-	int ret1 = it_stop(itd, 3000, 1);
-	int ret2 = it_stop(itd, 2500, 2);
-	int ret3 = it_stop(itd, 4000, 3);
+	int ret1 = joint_stop(jd, 3000, 1);
+	int ret2 = joint_stop(jd, 2500, 2);
+	int ret3 = joint_stop(jd, 4000, 3);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
 	ASSERT_EQ(ret3, 0);
 }
 
-/* Test for qmap association bug - stop two entities in reverse order */
-TEST(qmap_association_two_entities) {
-	unsigned itd = it_init(NULL);
+/* Test for corm association bug - stop two entities in reverse order */
+TEST(corm_association_two_entities) {
+	unsigned jd = joint_init(NULL);
 	
 	/* Start two entities with overlapping intervals */
-	it_start(itd, 1000, 1);
-	it_start(itd, 1500, 2);
+	joint_start(jd, 1000, 1);
+	joint_start(jd, 1500, 2);
 	
 	/* Stop entity 2 first - tests that secondary index is properly maintained */
-	int ret1 = it_stop(itd, 2500, 2);
+	int ret1 = joint_stop(jd, 2500, 2);
 	ASSERT_EQ(ret1, 0);
 	
 	/* Stop entity 1 second - previously failed due to corrupted secondary index */
-	int ret2 = it_stop(itd, 3000, 1);
+	int ret2 = joint_stop(jd, 3000, 1);
 	ASSERT_EQ(ret2, 0);
 }
 
-/* Test for qmap association bug - stop entities in different orders */
-TEST(qmap_association_reverse_order) {
-	unsigned itd = it_init(NULL);
+/* Test for corm association bug - stop entities in different orders */
+TEST(corm_association_reverse_order) {
+	unsigned jd = joint_init(NULL);
 	
 	/* Start 3 entities */
-	it_start(itd, 1000, 1);
-	it_start(itd, 1500, 2);
-	it_start(itd, 2000, 3);
+	joint_start(jd, 1000, 1);
+	joint_start(jd, 1500, 2);
+	joint_start(jd, 2000, 3);
 	
 	/* Stop in reverse order */
-	int ret3 = it_stop(itd, 4000, 3);
-	int ret2 = it_stop(itd, 2500, 2);
-	int ret1 = it_stop(itd, 3000, 1);
+	int ret3 = joint_stop(jd, 4000, 3);
+	int ret2 = joint_stop(jd, 2500, 2);
+	int ret1 = joint_stop(jd, 3000, 1);
 	
 	ASSERT_EQ(ret3, 0);
 	ASSERT_EQ(ret2, 0);
 	ASSERT_EQ(ret1, 0);
 }
 
-/* Test for qmap association bug - stop entities in mixed order */
-TEST(qmap_association_mixed_order) {
-	unsigned itd = it_init(NULL);
+/* Test for corm association bug - stop entities in mixed order */
+TEST(corm_association_mixed_order) {
+	unsigned jd = joint_init(NULL);
 	
 	/* Start 4 entities */
-	it_start(itd, 1000, 1);
-	it_start(itd, 1500, 2);
-	it_start(itd, 2000, 3);
-	it_start(itd, 2500, 4);
+	joint_start(jd, 1000, 1);
+	joint_start(jd, 1500, 2);
+	joint_start(jd, 2000, 3);
+	joint_start(jd, 2500, 4);
 	
 	/* Stop in mixed order: 2, 4, 1, 3 */
-	int ret2 = it_stop(itd, 3500, 2);
-	int ret4 = it_stop(itd, 5000, 4);
-	int ret1 = it_stop(itd, 4000, 1);
-	int ret3 = it_stop(itd, 4500, 3);
+	int ret2 = joint_stop(jd, 3500, 2);
+	int ret4 = joint_stop(jd, 5000, 4);
+	int ret1 = joint_stop(jd, 4000, 1);
+	int ret3 = joint_stop(jd, 4500, 3);
 	
 	ASSERT_EQ(ret2, 0);
 	ASSERT_EQ(ret4, 0);
@@ -315,121 +319,121 @@ TEST(qmap_association_mixed_order) {
 }
 
 TEST(multiple_entities_nonoverlapping) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
-	it_start(itd, 1000, 1);
-	it_stop(itd, 2000, 1);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 2000, 1);
 	
-	it_start(itd, 3000, 2);
-	it_stop(itd, 4000, 2);
+	joint_start(jd, 3000, 2);
+	joint_stop(jd, 4000, 2);
 	
-	it_start(itd, 5000, 3);
-	int ret = it_stop(itd, 6000, 3);
+	joint_start(jd, 5000, 3);
+	int ret = joint_stop(jd, 6000, 3);
 	
 	ASSERT_EQ(ret, 0);
 }
 
 TEST(same_entity_multiple_intervals) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	unsigned id = 1;
 	
-	it_start(itd, 1000, id);
-	it_stop(itd, 2000, id);
+	joint_start(jd, 1000, id);
+	joint_stop(jd, 2000, id);
 	
-	it_start(itd, 3000, id);
-	it_stop(itd, 4000, id);
+	joint_start(jd, 3000, id);
+	joint_stop(jd, 4000, id);
 	
-	it_start(itd, 5000, id);
-	int ret = it_stop(itd, 6000, id);
+	joint_start(jd, 5000, id);
+	int ret = joint_stop(jd, 6000, id);
 	
 	ASSERT_EQ(ret, 0);
 }
 
 TEST(interleaved_operations) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
-	it_start(itd, 1000, 1);
-	it_start(itd, 1100, 2);
-	it_stop(itd, 1200, 1);
-	it_start(itd, 1300, 3);
-	it_stop(itd, 1400, 2);
-	int ret = it_stop(itd, 1500, 3);
+	joint_start(jd, 1000, 1);
+	joint_start(jd, 1100, 2);
+	joint_stop(jd, 1200, 1);
+	joint_start(jd, 1300, 3);
+	joint_stop(jd, 1400, 2);
+	int ret = joint_stop(jd, 1500, 3);
 	
 	ASSERT_EQ(ret, 0);
 }
 
 TEST(many_entities) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	time_t base = 1000;
 	
 	/* Start 10 entities */
 	for (unsigned i = 0; i < 10; i++) {
-		int ret = it_start(itd, base + i * 100, i);
+		int ret = joint_start(jd, base + i * 100, i);
 		ASSERT_EQ(ret, 0);
 	}
 	
 	/* Stop 10 entities */
 	for (unsigned i = 0; i < 10; i++) {
-		int ret = it_stop(itd, base + 1000 + i * 100, i);
+		int ret = joint_stop(jd, base + 1000 + i * 100, i);
 		ASSERT_EQ(ret, 0);
 	}
 }
 
 TEST(entity_zero) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	unsigned id = 0;
 	
-	int ret1 = it_start(itd, 1000, id);
-	int ret2 = it_stop(itd, 2000, id);
+	int ret1 = joint_start(jd, 1000, id);
+	int ret2 = joint_stop(jd, 2000, id);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
 }
 
 TEST(large_entity_id) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	unsigned id = 999999;
 	
-	int ret1 = it_start(itd, 1000, id);
-	int ret2 = it_stop(itd, 2000, id);
+	int ret1 = joint_start(jd, 1000, id);
+	int ret2 = joint_stop(jd, 2000, id);
 	
 	ASSERT_EQ(ret1, 0);
 	ASSERT_EQ(ret2, 0);
 }
 
 /* ============================================
- * Category 4: Intersection Queries (it_iter + it_next)
+ * Category 4: Intersection Queries (joint_iter + joint_next)
  * ============================================ */
 
 TEST(iter_empty_range) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Add interval outside query range */
-	it_start(itd, 1000, 1);
-	it_stop(itd, 2000, 1);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 2000, 1);
 	
 	/* Query range that doesn't intersect */
-	it_cur_t cur = it_iter(itd, 3000, 4000);
+	joint_cur_t cur = joint_iter(jd, 3000, 4000);
 	time_t min, max;
 	unsigned count, who;
 	
-	int has_results = it_next(&min, &max, &count, &who, &cur);
+	int has_results = joint_next(&min, &max, &count, &who, &cur);
 	ASSERT_EQ(has_results, 0); /* Should be empty */
 }
 
 TEST(iter_single_interval) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Single interval fully in range */
-	it_start(itd, 1000, 42);
-	it_stop(itd, 2000, 42);
+	joint_start(jd, 1000, 42);
+	joint_stop(jd, 2000, 42);
 	
 	/* Query covering the interval */
-	it_cur_t cur = it_iter(itd, 500, 2500);
+	joint_cur_t cur = joint_iter(jd, 500, 2500);
 	time_t min, max;
 	unsigned count, who;
 	
-	int ret = it_next(&min, &max, &count, &who, &cur);
+	int ret = joint_next(&min, &max, &count, &who, &cur);
 	ASSERT_EQ(ret, 1);
 	ASSERT_EQ(min, 1000);
 	ASSERT_EQ(max, 2000);
@@ -437,23 +441,23 @@ TEST(iter_single_interval) {
 	ASSERT_EQ(who, 42);
 	
 	/* Should be no more results */
-	ret = it_next(&min, &max, &count, &who, &cur);
+	ret = joint_next(&min, &max, &count, &who, &cur);
 	ASSERT_EQ(ret, 0);
 }
 
 TEST(iter_partial_overlap) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Interval extends beyond query range */
-	it_start(itd, 1000, 5);
-	it_stop(itd, 3000, 5);
+	joint_start(jd, 1000, 5);
+	joint_stop(jd, 3000, 5);
 	
 	/* Query only part of the interval */
-	it_cur_t cur = it_iter(itd, 1500, 2500);
+	joint_cur_t cur = joint_iter(jd, 1500, 2500);
 	time_t min, max;
 	unsigned count, who;
 	
-	int ret = it_next(&min, &max, &count, &who, &cur);
+	int ret = joint_next(&min, &max, &count, &who, &cur);
 	ASSERT_EQ(ret, 1);
 	/* Should get the intersection portion */
 	ASSERT_EQ(min, 1500);
@@ -462,25 +466,25 @@ TEST(iter_partial_overlap) {
 }
 
 TEST(iter_multiple_non_overlapping) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Three separate intervals */
-	it_start(itd, 1000, 1);
-	it_stop(itd, 1500, 1);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 1500, 1);
 	
-	it_start(itd, 2000, 2);
-	it_stop(itd, 2500, 2);
+	joint_start(jd, 2000, 2);
+	joint_stop(jd, 2500, 2);
 	
-	it_start(itd, 3000, 3);
-	it_stop(itd, 3500, 3);
+	joint_start(jd, 3000, 3);
+	joint_stop(jd, 3500, 3);
 	
 	/* Query covering all three */
-	it_cur_t cur = it_iter(itd, 900, 3600);
+	joint_cur_t cur = joint_iter(jd, 900, 3600);
 	time_t min, max;
 	unsigned count, who;
 	int found_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		found_count++;
 		ASSERT(count == 1); /* Each segment has only one entity */
 	}
@@ -489,18 +493,18 @@ TEST(iter_multiple_non_overlapping) {
 }
 
 TEST(iter_exact_boundaries) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Interval exactly matches query range */
-	it_start(itd, 1000, 99);
-	it_stop(itd, 2000, 99);
+	joint_start(jd, 1000, 99);
+	joint_stop(jd, 2000, 99);
 	
 	/* Query with exact same boundaries */
-	it_cur_t cur = it_iter(itd, 1000, 2000);
+	joint_cur_t cur = joint_iter(jd, 1000, 2000);
 	time_t min, max;
 	unsigned count, who;
 	
-	int ret = it_next(&min, &max, &count, &who, &cur);
+	int ret = joint_next(&min, &max, &count, &who, &cur);
 	ASSERT_EQ(ret, 1);
 	ASSERT_EQ(min, 1000);
 	ASSERT_EQ(max, 2000);
@@ -508,56 +512,56 @@ TEST(iter_exact_boundaries) {
 }
 
 TEST(iter_before_range) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Intervals completely before query range */
-	it_start(itd, 100, 1);
-	it_stop(itd, 200, 1);
-	it_start(itd, 300, 2);
-	it_stop(itd, 400, 2);
+	joint_start(jd, 100, 1);
+	joint_stop(jd, 200, 1);
+	joint_start(jd, 300, 2);
+	joint_stop(jd, 400, 2);
 	
 	/* Query after all intervals */
-	it_cur_t cur = it_iter(itd, 1000, 2000);
+	joint_cur_t cur = joint_iter(jd, 1000, 2000);
 	time_t min, max;
 	unsigned count, who;
 	
-	int ret = it_next(&min, &max, &count, &who, &cur);
+	int ret = joint_next(&min, &max, &count, &who, &cur);
 	ASSERT_EQ(ret, 0); /* Should be empty */
 }
 
 TEST(iter_after_range) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Intervals completely after query range */
-	it_start(itd, 5000, 1);
-	it_stop(itd, 6000, 1);
+	joint_start(jd, 5000, 1);
+	joint_stop(jd, 6000, 1);
 	
 	/* Query before all intervals */
-	it_cur_t cur = it_iter(itd, 1000, 2000);
+	joint_cur_t cur = joint_iter(jd, 1000, 2000);
 	time_t min, max;
 	unsigned count, who;
 	
-	int ret = it_next(&min, &max, &count, &who, &cur);
+	int ret = joint_next(&min, &max, &count, &who, &cur);
 	ASSERT_EQ(ret, 0); /* Should be empty */
 }
 
 TEST(iter_same_entity_multiple_intervals) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Same entity with two separate intervals */
-	it_start(itd, 1000, 7);
-	it_stop(itd, 1500, 7);
+	joint_start(jd, 1000, 7);
+	joint_stop(jd, 1500, 7);
 	
-	it_start(itd, 2000, 7);
-	it_stop(itd, 2500, 7);
+	joint_start(jd, 2000, 7);
+	joint_stop(jd, 2500, 7);
 	
 	/* Query covering both intervals */
-	it_cur_t cur = it_iter(itd, 900, 2600);
+	joint_cur_t cur = joint_iter(jd, 900, 2600);
 	time_t min, max;
 	unsigned count, who;
 	int found_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		ASSERT_EQ(who, 7); /* Always entity 7 */
 		found_count++;
 	}
@@ -571,19 +575,19 @@ TEST(iter_same_entity_multiple_intervals) {
 
 /* Test: Single entity present throughout range - should create one split */
 TEST(split_single_entity_full_range) {
-	unsigned itd = it_init(NULL);
-	it_cur_t cur;
+	unsigned jd = joint_init(NULL);
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int split_count;
 	
-	it_start(itd, 1000, 1);
-	it_stop(itd, 3000, 1);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 3000, 1);
 	
-	cur = it_iter(itd, 1000, 3000);
+	cur = joint_iter(jd, 1000, 3000);
 	split_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		split_count++;
 		ASSERT_EQ(who, 1);
 		ASSERT_EQ(count, 1);
@@ -596,23 +600,23 @@ TEST(split_single_entity_full_range) {
 
 /* Test: Two entities with overlapping intervals - should create 3 splits */
 TEST(split_two_overlapping) {
-	unsigned itd = it_init(NULL);
-	it_cur_t cur;
+	unsigned jd = joint_init(NULL);
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int split_count, counts[10], i;
 	
 	for (i = 0; i < 10; i++) counts[i] = 0;
 	
-	it_start(itd, 1000, 1);
-	it_stop(itd, 3000, 1);
-	it_start(itd, 2000, 2);
-	it_stop(itd, 4000, 2);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 3000, 1);
+	joint_start(jd, 2000, 2);
+	joint_stop(jd, 4000, 2);
 	
-	cur = it_iter(itd, 1000, 4000);
+	cur = joint_iter(jd, 1000, 4000);
 	split_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		counts[count]++;
 		split_count++;
 	}
@@ -625,23 +629,23 @@ TEST(split_two_overlapping) {
 
 /* Test: Gap in coverage - should handle periods with no entities */
 TEST(split_with_gap) {
-	unsigned itd = it_init(NULL);
-	it_cur_t cur;
+	unsigned jd = joint_init(NULL);
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int split_count, found_entity1, found_entity2;
 	
-	it_start(itd, 1000, 1);
-	it_stop(itd, 2000, 1);
-	it_start(itd, 3000, 2);
-	it_stop(itd, 4000, 2);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 2000, 1);
+	joint_start(jd, 3000, 2);
+	joint_stop(jd, 4000, 2);
 	
-	cur = it_iter(itd, 1000, 4000);
+	cur = joint_iter(jd, 1000, 4000);
 	split_count = 0;
 	found_entity1 = 0;
 	found_entity2 = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		split_count++;
 		if (who == 1) found_entity1++;
 		if (who == 2) found_entity2++;
@@ -654,24 +658,24 @@ TEST(split_with_gap) {
 
 /* Test: Three entities with different overlaps */
 TEST(split_three_entities) {
-	unsigned itd = it_init(NULL);
-	it_cur_t cur;
+	unsigned jd = joint_init(NULL);
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int split_count, max_count;
 	
-	it_start(itd, 1000, 1);
-	it_stop(itd, 4000, 1);
-	it_start(itd, 2000, 2);
-	it_stop(itd, 3000, 2);
-	it_start(itd, 2500, 3);
-	it_stop(itd, 3500, 3);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 4000, 1);
+	joint_start(jd, 2000, 2);
+	joint_stop(jd, 3000, 2);
+	joint_start(jd, 2500, 3);
+	joint_stop(jd, 3500, 3);
 	
-	cur = it_iter(itd, 1000, 4000);
+	cur = joint_iter(jd, 1000, 4000);
 	split_count = 0;
 	max_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		split_count++;
 		if ((int)count > max_count) max_count = count;
 	}
@@ -682,19 +686,19 @@ TEST(split_three_entities) {
 
 /* Test: Query range partially outside intervals */
 TEST(split_partial_query_range) {
-	unsigned itd = it_init(NULL);
-	it_cur_t cur;
+	unsigned jd = joint_init(NULL);
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int split_count;
 	
-	it_start(itd, 2000, 1);
-	it_stop(itd, 3000, 1);
+	joint_start(jd, 2000, 1);
+	joint_stop(jd, 3000, 1);
 	
-	cur = it_iter(itd, 1000, 4000);
+	cur = joint_iter(jd, 1000, 4000);
 	split_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		split_count++;
 		ASSERT_EQ(who, 1);
 		/* Split should be clipped to interval bounds */
@@ -707,19 +711,19 @@ TEST(split_partial_query_range) {
 
 /* Test: Query range entirely within one interval */
 TEST(split_query_within_interval) {
-	unsigned itd = it_init(NULL);
-	it_cur_t cur;
+	unsigned jd = joint_init(NULL);
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int split_count;
 	
-	it_start(itd, 1000, 1);
-	it_stop(itd, 5000, 1);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 5000, 1);
 	
-	cur = it_iter(itd, 2000, 3000);
+	cur = joint_iter(jd, 2000, 3000);
 	split_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		split_count++;
 		ASSERT_EQ(who, 1);
 		ASSERT_EQ(min, 2000);
@@ -732,23 +736,23 @@ TEST(split_query_within_interval) {
 
 /* Test: Adjacent intervals (no overlap) */
 TEST(split_adjacent_intervals) {
-	unsigned itd = it_init(NULL);
-	it_cur_t cur;
+	unsigned jd = joint_init(NULL);
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int split_count, found_entity1, found_entity2;
 	
-	it_start(itd, 1000, 1);
-	it_stop(itd, 2000, 1);
-	it_start(itd, 2000, 2);
-	it_stop(itd, 3000, 2);
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 2000, 1);
+	joint_start(jd, 2000, 2);
+	joint_stop(jd, 3000, 2);
 	
-	cur = it_iter(itd, 1000, 3000);
+	cur = joint_iter(jd, 1000, 3000);
 	split_count = 0;
 	found_entity1 = 0;
 	found_entity2 = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		split_count++;
 		if (who == 1) found_entity1++;
 		if (who == 2) found_entity2++;
@@ -761,21 +765,21 @@ TEST(split_adjacent_intervals) {
 
 /* Test: Many small overlapping intervals */
 TEST(split_many_small_intervals) {
-	unsigned itd = it_init(NULL);
-	it_cur_t cur;
+	unsigned jd = joint_init(NULL);
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who, i;
 	int split_count;
 	
 	for (i = 0; i < 10; i++) {
-		it_start(itd, 1000 + i * 100, i + 1);
-		it_stop(itd, 1200 + i * 100, i + 1);
+		joint_start(jd, 1000 + i * 100, i + 1);
+		joint_stop(jd, 1200 + i * 100, i + 1);
 	}
 	
-	cur = it_iter(itd, 1000, 2000);
+	cur = joint_iter(jd, 1000, 2000);
 	split_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		split_count++;
 	}
 	
@@ -824,10 +828,10 @@ TEST(time_parse_unix_timestamp) {
 /* Test: Format infinity values */
 TEST(time_format_infinity) {
 	char buf[DATE_MAX_LEN];
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
 	/* Get the infinity constants by creating an open interval */
-	it_start(itd, 1000, 1);
+	joint_start(jd, 1000, 1);
 	
 	/* Note: mtinf and tinf are internal constants, so we test via the API */
 	/* We can't directly test them, but we verify printtime handles edge cases */
@@ -871,25 +875,25 @@ TEST(time_roundtrip) {
 /* Test: Save and load from file */
 TEST(persist_save_load) {
 	unsigned itd1, itd2;
-	it_cur_t cur;
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int found;
 	
 	/* Create database with data */
-	itd1 = it_init("/tmp/test_persist.db");
-	it_start(itd1, 1000, 42);
-	it_stop(itd1, 2000, 42);
-	it_close(itd1); /* Close to persist data */
+	itd1 = joint_init("/tmp/test_persist.db");
+	joint_start(itd1, 1000, 42);
+	joint_stop(itd1, 2000, 42);
+	joint_close(itd1); /* Close to persist data */
 	
 	/* Load database in new handle */
-	itd2 = it_init("/tmp/test_persist.db");
+	itd2 = joint_init("/tmp/test_persist.db");
 	
 	/* Verify data persisted */
-	cur = it_iter(itd2, 500, 2500);
+	cur = joint_iter(itd2, 500, 2500);
 	found = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		if (who == 42 && min == 1000 && max == 2000) {
 			found = 1;
 		}
@@ -901,29 +905,29 @@ TEST(persist_save_load) {
 /* Test: Multiple intervals persist correctly */
 TEST(persist_multiple_intervals) {
 	unsigned itd1, itd2;
-	it_cur_t cur;
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int found_count;
 	
 	/* Create database with multiple intervals */
-	itd1 = it_init("/tmp/test_persist_multi.db");
-	it_start(itd1, 1000, 1);
-	it_stop(itd1, 2000, 1);
-	it_start(itd1, 3000, 2);
-	it_stop(itd1, 4000, 2);
-	it_start(itd1, 5000, 3);
-	it_stop(itd1, 6000, 3);
-	it_close(itd1); /* Close to persist data */
+	itd1 = joint_init("/tmp/test_persist_multi.db");
+	joint_start(itd1, 1000, 1);
+	joint_stop(itd1, 2000, 1);
+	joint_start(itd1, 3000, 2);
+	joint_stop(itd1, 4000, 2);
+	joint_start(itd1, 5000, 3);
+	joint_stop(itd1, 6000, 3);
+	joint_close(itd1); /* Close to persist data */
 	
 	/* Reload */
-	itd2 = it_init("/tmp/test_persist_multi.db");
+	itd2 = joint_init("/tmp/test_persist_multi.db");
 	
 	/* Count intervals */
-	cur = it_iter(itd2, 0, 7000);
+	cur = joint_iter(itd2, 0, 7000);
 	found_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		found_count++;
 	}
 	
@@ -933,21 +937,21 @@ TEST(persist_multiple_intervals) {
 /* Test: Empty database persists correctly */
 TEST(persist_empty_database) {
 	unsigned itd1, itd2;
-	it_cur_t cur;
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int has_results;
 	
 	/* Create empty database */
-	itd1 = it_init("/tmp/test_persist_empty.db");
-	it_close(itd1); /* Close to persist data */
+	itd1 = joint_init("/tmp/test_persist_empty.db");
+	joint_close(itd1); /* Close to persist data */
 	
 	/* Reload */
-	itd2 = it_init("/tmp/test_persist_empty.db");
+	itd2 = joint_init("/tmp/test_persist_empty.db");
 	
 	/* Should be empty */
-	cur = it_iter(itd2, 0, 10000);
-	has_results = it_next(&min, &max, &count, &who, &cur);
+	cur = joint_iter(itd2, 0, 10000);
+	has_results = joint_next(&min, &max, &count, &who, &cur);
 	
 	ASSERT_EQ(has_results, 0);
 }
@@ -955,29 +959,29 @@ TEST(persist_empty_database) {
 /* Test: Append to existing database */
 TEST(persist_append) {
 	unsigned itd1, itd2, itd3;
-	it_cur_t cur;
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who;
 	int found_count;
 	
 	/* Create initial data */
-	itd1 = it_init("/tmp/test_persist_append.db");
-	it_start(itd1, 1000, 1);
-	it_stop(itd1, 2000, 1);
-	it_close(itd1); /* Close to persist data */
+	itd1 = joint_init("/tmp/test_persist_append.db");
+	joint_start(itd1, 1000, 1);
+	joint_stop(itd1, 2000, 1);
+	joint_close(itd1); /* Close to persist data */
 	
 	/* Reload and add more */
-	itd2 = it_init("/tmp/test_persist_append.db");
-	it_start(itd2, 3000, 2);
-	it_stop(itd2, 4000, 2);
-	it_close(itd2); /* Close to persist data */
+	itd2 = joint_init("/tmp/test_persist_append.db");
+	joint_start(itd2, 3000, 2);
+	joint_stop(itd2, 4000, 2);
+	joint_close(itd2); /* Close to persist data */
 	
 	/* Reload again and verify both intervals exist */
-	itd3 = it_init("/tmp/test_persist_append.db");
-	cur = it_iter(itd3, 0, 5000);
+	itd3 = joint_init("/tmp/test_persist_append.db");
+	cur = joint_iter(itd3, 0, 5000);
 	found_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		found_count++;
 	}
 	
@@ -987,27 +991,27 @@ TEST(persist_append) {
 /* Test: Large dataset persistence */
 TEST(persist_large_dataset) {
 	unsigned itd1, itd2;
-	it_cur_t cur;
+	joint_cur_t cur;
 	time_t min, max;
 	unsigned count, who, i;
 	int found_count;
 	
 	/* Create large dataset */
-	itd1 = it_init("/tmp/test_persist_large.db");
+	itd1 = joint_init("/tmp/test_persist_large.db");
 	for (i = 0; i < 50; i++) {
-		it_start(itd1, 1000 + i * 100, i + 1);
-		it_stop(itd1, 1050 + i * 100, i + 1);
+		joint_start(itd1, 1000 + i * 100, i + 1);
+		joint_stop(itd1, 1050 + i * 100, i + 1);
 	}
-	it_close(itd1); /* Close to persist data */
+	joint_close(itd1); /* Close to persist data */
 	
 	/* Reload */
-	itd2 = it_init("/tmp/test_persist_large.db");
+	itd2 = joint_init("/tmp/test_persist_large.db");
 	
 	/* Count intervals */
-	cur = it_iter(itd2, 0, 10000);
+	cur = joint_iter(itd2, 0, 10000);
 	found_count = 0;
 	
-	while (it_next(&min, &max, &count, &who, &cur)) {
+	while (joint_next(&min, &max, &count, &who, &cur)) {
 		found_count++;
 	}
 	
@@ -1019,53 +1023,443 @@ TEST(persist_large_dataset) {
  * ============================================ */
 
 TEST(validation_extreme_timestamp_start) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
-	/* Test timestamp beyond valid range (> LONG_MAX/2) in it_start */
+	/* Test timestamp beyond valid range (> LONG_MAX/2) in joint_start */
 	time_t extreme_ts = LONG_MAX / 2 + 1;
-	int result = it_start(itd, extreme_ts, 1);
+	int result = joint_start(jd, extreme_ts, 1);
 	
 	ASSERT(result == -1);
 	ASSERT(errno == ERANGE);
 }
 
 TEST(validation_extreme_timestamp_stop) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
-	/* Test timestamp beyond valid range (> LONG_MAX/2) in it_stop */
+	/* Test timestamp beyond valid range (> LONG_MAX/2) in joint_stop */
 	time_t extreme_ts = LONG_MAX / 2 + 1;
-	int result = it_stop(itd, extreme_ts, 1);
+	int result = joint_stop(jd, extreme_ts, 1);
 	
 	ASSERT(result == -1);
 	ASSERT(errno == ERANGE);
 }
 
 TEST(validation_uint32_max_start) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
-	/* Test UINT32_MAX entity ID (reserved as IDM_MISS sentinel) in it_start */
-	int result = it_start(itd, 1000, UINT32_MAX);
+	/* Test UINT32_MAX entity ID (reserved as IDM_MISS sentinel) in joint_start */
+	int result = joint_start(jd, 1000, UINT32_MAX);
 	
 	ASSERT(result == -1);
 	ASSERT(errno == EINVAL);
 }
 
 TEST(validation_uint32_max_stop) {
-	unsigned itd = it_init(NULL);
+	unsigned jd = joint_init(NULL);
 	
-	/* Test UINT32_MAX entity ID (reserved as IDM_MISS sentinel) in it_stop */
-	int result = it_stop(itd, 1000, UINT32_MAX);
+	/* Test UINT32_MAX entity ID (reserved as IDM_MISS sentinel) in joint_stop */
+	int result = joint_stop(jd, 1000, UINT32_MAX);
 	
 	ASSERT(result == -1);
 	ASSERT(errno == EINVAL);
 }
 
 /* ============================================
- * Main test runner
+ * Category 9: rec_query "joint" axis registration
  * ============================================ */
 
+static int rec_ref_present(const rec_set_t *s, rec_ref_t r)
+{
+	const rec_ref_t *a = rec_set_at(s);
+	size_t n = rec_set_count(s);
+	size_t i;
+
+	for (i = 0; i < n; i++)
+		if (a[i] == r)
+			return 1;
+	return 0;
+}
+
+TEST(rec_axis_fill_interval_matches_manual_walk) {
+	unsigned jd = joint_init(NULL);
+	rec_set_t *manual = rec_set_new();
+	rec_set_t *viafn;
+	joint_cur_t cur;
+	time_t min, max;
+	unsigned count, who;
+
+	joint_start(jd, 1000, 1);
+	joint_stop(jd, 2000, 1);
+	joint_start(jd, 1500, 2);
+	joint_stop(jd, 2500, 2);
+	joint_start(jd, 5000, 3);
+	joint_stop(jd, 6000, 3);
+
+	cur = joint_iter(jd, 900, 3000);
+	while (joint_next(&min, &max, &count, &who, &cur))
+		rec_set_push(manual, (rec_ref_t)who);
+	rec_set_seal(manual);
+
+	viafn = rec_set_new();
+	ASSERT(rec_axis_fill_interval(jd, 900, 3000, viafn) == 0);
+
+	ASSERT_EQ(rec_set_count(manual), rec_set_count(viafn));
+	ASSERT(rec_ref_present(viafn, 1));
+	ASSERT(rec_ref_present(viafn, 2));
+	ASSERT(!rec_ref_present(viafn, 3));
+
+	rec_set_free(manual);
+	rec_set_free(viafn);
+}
+
+TEST(rec_axis_fill_interval_null_out) {
+	unsigned jd = joint_init(NULL);
+
+	ASSERT(rec_axis_fill_interval(jd, 0, 1000, NULL) == -1);
+}
+
+TEST(rec_axis_joint_registered)
+{
+	int slot = -1;
+	int i;
+	const rec_axis_t *axis;
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) {
+			slot = i;
+			break;
+		}
+	}
+	ASSERT(slot >= 0);
+	axis = rec_axis_get(slot);
+	ASSERT(axis != NULL);
+	ASSERT(axis->fill != NULL);
+	ASSERT(axis->rank == NULL);
+	ASSERT(axis->decode != NULL);
+}
+
+TEST(rec_axis_joint_decode_and_fill)
+{
+	int slot = -1;
+	int i;
+	const rec_axis_t *axis;
+	unsigned jd = joint_init(NULL);
+	void *params;
+	rec_set_t *direct;
+	rec_set_t *via;
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) {
+			slot = i;
+			break;
+		}
+	}
+	ASSERT(slot >= 0);
+	ASSERT(rec_axis_set_ctx(slot, (void *)(uintptr_t)jd) == 0);
+	axis = rec_axis_get(slot);
+	ASSERT(axis->ctx == (void *)(uintptr_t)jd);
+
+	joint_start(jd, 1000000000, 7); /* 2001-09-09T01:46:40Z-ish, unix ts */
+	joint_stop(jd, 1000003600, 7);
+
+	params = rec_axis_decode(slot, "a=1000000000 b=1000003600");
+	ASSERT(params != NULL);
+
+	direct = rec_set_new();
+	ASSERT(rec_axis_fill_interval(jd, 1000000000, 1000003600, direct) == 0);
+
+	via = rec_set_new();
+	ASSERT(axis->fill(axis->ctx, params, via) == 0);
+
+	ASSERT_EQ(rec_set_count(direct), rec_set_count(via));
+	ASSERT(rec_ref_present(via, 7));
+
+	rec_set_free(direct);
+	rec_set_free(via);
+}
+
+TEST(rec_axis_joint_decode_dates)
+{
+	int slot = -1;
+	int i;
+	const rec_axis_t *axis;
+	struct { time_t a; time_t b; } *p;
+	void *params;
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) {
+			slot = i;
+			break;
+		}
+	}
+	ASSERT(slot >= 0);
+	params = rec_axis_decode(slot, "a=2024-01-01 b=2024-06-01");
+	ASSERT(params != NULL);
+	p = params;
+	ASSERT(p->a > 0);
+	ASSERT(p->b > p->a);
+}
+
+TEST(rec_axis_joint_decode_rejects_garbage)
+{
+	int slot = -1;
+	int i;
+	const rec_axis_t *axis;
+	struct { time_t a; time_t b; } *p;
+	void *params;
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) {
+			slot = i;
+			break;
+		}
+	}
+	ASSERT(slot >= 0);
+	axis = rec_axis_get(slot);
+
+	/* sscantime would CBUG-abort here; the safe decode must say NULL. */
+	params = rec_axis_decode(slot, "a=garbage");
+	ASSERT(params == NULL);
+	params = rec_axis_decode(slot, "a=");
+	ASSERT(params == NULL);
+
+	/* a bad key must not poison a later good one (last-wins on the key). */
+	params = rec_axis_decode(slot, "b=garbage b=2026-06-01");
+	ASSERT(params != NULL);
+	p = params;
+	ASSERT(p->b > 0);
+	ASSERT_EQ(p->a, 0);
+
+	/* one good key with the other absent: 0 = unbounded (not NULL). */
+	params = rec_axis_decode(slot, "a=2026-09-15");
+	ASSERT(params != NULL);
+	p = params;
+	ASSERT(p->a > 0);
+	ASSERT_EQ(p->b, 0);
+
+	/* a garbage a plus a valid b: still usable, a unbounded. */
+	params = rec_axis_decode(slot, "a=garbage b=2026-09-16");
+	ASSERT(params != NULL);
+	p = params;
+	ASSERT_EQ(p->a, 0);
+	ASSERT(p->b > 0);
+}
+
+TEST(rec_axis_joint_cli_options)
+{
+	const struct rec_axis_cli_option *tbl = rec_axis_cli_options();
+	int slot = -1, i;
+	const rec_axis_t *axis;
+	void *p;
+	struct { time_t a; time_t b; } *jp;
+	unsigned jd;
+	rec_set_t *out;
+	char exp_since[] = "2026-09-14";
+	char exp_until[] = "2026-09-16";
+	time_t exp_a = sscantime(exp_since);
+	time_t exp_b = sscantime(exp_until);
+	char leaf_far[] = "a=2000000000 b=2000003600";
+	char leaf_half[] = "a=2000000000";
+
+	tbl = rec_axis_cli_options();
+	ASSERT(tbl != NULL);
+	ASSERT(!strcmp(tbl[0].name, "since") && tbl[0].has_arg == 1);
+	ASSERT(!strcmp(tbl[1].name, "until") && tbl[1].has_arg == 1);
+	ASSERT(!strcmp(tbl[2].name, "query") && tbl[2].has_arg == 1);
+	ASSERT(tbl[3].name == NULL);
+
+	ASSERT(rec_axis_config_arg("since", NULL) != 0);
+	ASSERT(rec_axis_config_arg("until", NULL) != 0);
+	ASSERT(rec_axis_config_arg("bogus", "x") != 0);
+	ASSERT(rec_axis_config_arg("since", "garbage") != 0);
+	ASSERT(rec_axis_config_arg("until", "2026-13-40") != 0);
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) { slot = i; break; }
+	}
+	ASSERT(slot >= 0);
+	axis = rec_axis_get(slot);
+
+	p = axis->decode(NULL);
+	ASSERT(p == NULL);
+
+	ASSERT(rec_axis_config_arg("since", "2026-09-14") == 0);
+	p = axis->decode(NULL);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, 0);
+
+	ASSERT(rec_axis_config_arg("until", "2026-09-16") == 0);
+	p = axis->decode(NULL);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, exp_b);
+
+	jd = joint_init(NULL);
+	joint_start(jd, exp_a, 10);
+	joint_stop(jd, exp_a + 86400, 10);
+	ASSERT(rec_axis_set_ctx(slot, (void *)(uintptr_t)jd) == 0);
+	axis = rec_axis_get(slot);
+	out = rec_set_new();
+	ASSERT(axis->fill(axis->ctx, p, out) == 0);
+	ASSERT(rec_ref_present(out, 10));
+	rec_set_free(out);
+
+	p = axis->decode(leaf_far);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT(jp->a > exp_a && jp->b > exp_b);
+
+	p = axis->decode(leaf_half);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT(jp->a > 1000000000);
+	ASSERT_EQ(jp->b, exp_b);
+
+	p = axis->decode("");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, exp_b);
+}
+
+/* Runs right after rec_axis_joint_cli_options, so --since/--until are
+ * SET (2026-09-14 / 2026-09-16) — that state lets us prove the per-end
+ * fallback order since/until > query by observing query stay masked on
+ * the bare path while the leaf `query=` key wins outright. */
+TEST(rec_axis_joint_cli_query)
+{
+	const struct rec_axis_cli_option *tbl = rec_axis_cli_options();
+	int slot = -1, i;
+	const rec_axis_t *axis;
+	void *p;
+	struct { time_t a; time_t b; } *jp;
+	char exp_qa[] = "2026-09-17";
+	char exp_qb[] = "2026-09-18";
+	time_t qa = sscantime(exp_qa);
+	time_t qb = sscantime(exp_qb);
+	time_t day_a = sscantime("2026-09-14");
+	time_t exp_a = sscantime("2026-09-14");
+	time_t exp_b = sscantime("2026-09-16");
+
+	tbl = rec_axis_cli_options();
+	ASSERT(tbl != NULL);
+	ASSERT(!strcmp(tbl[2].name, "query") && tbl[2].has_arg == 1);
+
+	/* Point or interval through the CLI --query broadcast path. */
+	ASSERT(rec_axis_config_arg("query", NULL) != 0);
+	/* accept-and-ignore: non-parseable returns 0, stores nothing. */
+	ASSERT(rec_axis_config_arg("query", "garbage") == 0);
+	/* reversed interval is a genuine user error: -1. */
+	ASSERT(rec_axis_config_arg("query", "2026-09-19..2026-09-18") == -1);
+	/* spaced interval is non-parseable by rule: ignored, rc 0. */
+	ASSERT(rec_axis_config_arg("query", "2026-09-14 ..2026-09-15") == 0);
+
+	/* A valid interval stores CLI query state. */
+	ASSERT(rec_axis_config_arg("query", "2026-09-17..2026-09-18") == 0);
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) { slot = i; break; }
+	}
+	ASSERT(slot >= 0);
+	axis = rec_axis_get(slot);
+	ASSERT(axis && axis->decode);
+
+	/* Bare path: since/until (set by the prior test) beat --query. */
+	p = axis->decode(NULL);
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, exp_b);
+
+	/* Per-end: leaf a wins over query for a; until still fills b. */
+	p = axis->decode("a=2000000000");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT(jp->a > 1000000000);
+	ASSERT_EQ(jp->b, exp_b);
+
+	/* Leaf `query=` key sets both ends (wins over CLI entirely). */
+	p = axis->decode("query=2026-09-17..2026-09-18");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, qa);
+	ASSERT_EQ(jp->b, qb);
+
+	/* Point leaf widens to its containing day (day rule). */
+	p = axis->decode("query=2026-09-14");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, day_a);
+	ASSERT(jp->b > day_a);
+	ASSERT_EQ(jp->b, sscantime("2026-09-15"));
+
+	/* Garbage leaf value is skipped; CLI since/until fall back. */
+	p = axis->decode("query=garbage");
+	ASSERT(p != NULL);
+	jp = p;
+	ASSERT_EQ(jp->a, exp_a);
+	ASSERT_EQ(jp->b, exp_b);
+}
+
+TEST(rec_axis_joint_open)
+{
+	int slot = -1;
+	int i;
+	const rec_axis_t *axis;
+	void *ctx;
+	unsigned jd;
+	void *params;
+	rec_set_t *direct;
+	rec_set_t *via;
+
+	for (i = 0; i < rec_axis_count(); i++) {
+		axis = rec_axis_get(i);
+		if (axis && !strcmp(axis->name, "joint")) {
+			slot = i;
+			break;
+		}
+	}
+	ASSERT(slot >= 0);
+
+	ctx = rec_axis_open(""); /* empty spec -> in-memory store */
+	ASSERT(ctx != NULL || (uintptr_t)ctx == 0); /* jd 0 is a valid handle */
+	jd = (unsigned)(uintptr_t)ctx;
+	ASSERT(rec_axis_set_ctx(slot, ctx) == 0);
+	axis = rec_axis_get(slot);
+	ASSERT(axis->ctx == ctx);
+
+	joint_start(jd, 2000000000, 42);
+	joint_stop(jd, 2000003600, 42);
+
+	params = rec_axis_decode(slot, "a=2000000000 b=2000003600");
+	ASSERT(params != NULL);
+
+	direct = rec_set_new();
+	ASSERT(rec_axis_fill_interval(jd, 2000000000, 2000003600, direct) == 0);
+
+	via = rec_set_new();
+	ASSERT(axis->fill(axis->ctx, params, via) == 0);
+
+	ASSERT_EQ(rec_set_count(direct), rec_set_count(via));
+	ASSERT(rec_ref_present(via, 42));
+
+	rec_set_free(direct);
+	rec_set_free(via);
+}
+
+
+
 int main(void) {
-	printf("Running libit tests...\n\n");
+	printf("Running libjoint tests...\n\n");
 	
 	/* Category 1: Basic Initialization */
 	printf("=== Category 1: Basic Initialization ===\n");
@@ -1090,9 +1484,9 @@ int main(void) {
 	printf("\n=== Category 3: Multiple Entities ===\n");
 	RUN_TEST(multiple_entities_separate);
 	RUN_TEST(multiple_entities_overlapping);
-	RUN_TEST(qmap_association_two_entities);
-	RUN_TEST(qmap_association_reverse_order);
-	RUN_TEST(qmap_association_mixed_order);
+	RUN_TEST(corm_association_two_entities);
+	RUN_TEST(corm_association_reverse_order);
+	RUN_TEST(corm_association_mixed_order);
 	RUN_TEST(multiple_entities_nonoverlapping);
 	RUN_TEST(same_entity_multiple_intervals);
 	RUN_TEST(interleaved_operations);
@@ -1145,6 +1539,18 @@ int main(void) {
 	RUN_TEST(validation_extreme_timestamp_stop);
 	RUN_TEST(validation_uint32_max_start);
 	RUN_TEST(validation_uint32_max_stop);
+	
+	/* Category 9: rec_query joint axis registration */
+	printf("\n=== Category 9: rec_query joint axis registration ===\n");
+	RUN_TEST(rec_axis_fill_interval_matches_manual_walk);
+	RUN_TEST(rec_axis_fill_interval_null_out);
+	RUN_TEST(rec_axis_joint_registered);
+	RUN_TEST(rec_axis_joint_decode_and_fill);
+	RUN_TEST(rec_axis_joint_decode_dates);
+	RUN_TEST(rec_axis_joint_decode_rejects_garbage);
+	RUN_TEST(rec_axis_joint_cli_options);
+	RUN_TEST(rec_axis_joint_cli_query);
+	RUN_TEST(rec_axis_joint_open);
 	
 	printf("\n=== Test Summary ===\n");
 	printf("Total errors: %u\n", errors);
