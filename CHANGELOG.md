@@ -5,37 +5,13 @@ All notable changes to libjoint will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 1.3.0
 
-### Changed — sweep-line performance tiers (query path ~2–48× faster)
-
-Public API unchanged. All work is in the query/split path
-(`joint_iter` → `joint_next`); write path (`joint_start`/`joint_stop`) untouched.
-
-- **T0**: `CFLAGS += -O3 -mpopcnt -mavx2 -mfma` (the library previously
-  built at `-O0`); new `make bench` target runs `bin/test_extended`
-  with µs timing lines.
-- **T1**: `isplit_cmp` no longer `memcpy`s 16 bytes per comparison —
-  direct pointer-cast field compare (≈2M·log(2M) comparisons per query).
-- **T2**: per-match `malloc` in `ti_intersect` replaced by a
-  `realloc`-grown contiguous `struct match_arena` (bulk-freed per query).
-- **T3**: per-split `malloc` + per-entity `ids_push` (one malloc each)
-  replaced by a query-level block-list arena (`struct split_arena`,
-  blocks never move so TAILQ pointers and `split->ids` stay stable
-  across `splits_fill` recursion); split id lists are contiguous
-  `uint32_t` LIFO stacks. Dead `splits_free` removed.
-- **T4**: the temp per-gap corm (`corm_open`/`corm_close` on every
-  `splits_get`) replaced by an ephemeral open-addressing `who_set`
-  (tombstone deletions, count maintained so `split_create` is
-  single-pass); `SPLITS_WHO_MASK` retired.
-
-### Fixed
-
-- Two latent signed-integer overflows in `src/test_extended.c` exposed
-  by `-Waggressive-loop-optimizations`/UBSan: `1700000000 + i * 86400`
-  (overflows `int` at i=5180) → `time_t` arithmetic; query end
-  `huge + 1000` (overflows int64) → `huge` (same coverage, interval
-  ends at `huge`).
+- **Renamed `libit` → `libjoint`**: the `it_*` API is now `joint_*` (`include/ttypt/joint.h`, `it.pc` → `joint.pc`; `LIBIT_LIMITATIONS.md` → `JOINT_LIMITATIONS.md`). Renames span the whole walker/splitter read model while the interval-tree semantics stay intact.
+- **Kernel composition**: new `rec_axis_*` adapters (`rec_axis_fill_interval`, `rec_axis_open`, plus `rec_axis_store`/`rec_axis_unstore`/`rec_axis_readback`) plug joint's interval/overlap matching straight into the recall kernel with `rec_ref_t` (`uint32_t`) refs; all axis parameters are CLI parameters.
+- **Sweep-line performance tiers**: public API unchanged; all work is in the query/split path (`joint_iter` → `joint_next`) — `-O3 -mpopcnt -mavx2 -mfma` build (was `-O0`), pointer-cast split compares (no 16-byte `memcpy` per comparison), a query-level `match_arena` replacing per-match mallocs, a block-list `split_arena` replacing per-split mallocs, and an ephemeral `who_set` (open addressing) replacing the per-gap temp corm. Query benchmarks: 1k overlap query 48.5×, 3k overlap query 48×, 1000 insert/query cycles 6.8×, sparse query 6.2×, splits(100) 5.5× faster (medians; `make bench`).
+- **Bug fixes**: two latent signed-integer overflows in `src/test_extended.c` exposed by UBSan (`int` overflow in timestamp arithmetic, `int64` overflow in query-end) — both corrected to `time_t`/`huge` arithmetic.
+- `libqmap` → `libcorm` rename.
 
 ### Performance (medians, µs; `make bench` on one loaded box)
 
