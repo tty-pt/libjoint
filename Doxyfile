@@ -1,2 +1,2 @@
-PROJECT_NAME           = "Interval Tree Library"
+PROJECT_NAME           = "joint"
 @INCLUDE = ../mk/Doxyfile
