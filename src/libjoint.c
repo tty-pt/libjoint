@@ -1317,7 +1317,13 @@ rec_axis_store(void *ctx, const char *spec, rec_ref_t ref, const char *value)
 		errno = EINVAL;
 		return -1;
 	}
+	const char *colon = strchr(value, ':');
 	comma = strchr(value, ',');
+	if (colon && (!comma || colon < comma)) {
+		/* mm shape <DATE>:<PAYLOAD> — date prefix is before the colon;
+		 * any commas after the colon belong to the payload (e.g. JSON) */
+		comma = NULL;
+	}
 	if (!comma) {
 		/* open form: exact date first, else leading-date prefix */
 		time_t ts;
