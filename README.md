@@ -1,10 +1,15 @@
+<p align="center">
+  <img src="assets/logo.png" alt="libjoint logo" width="220" />
+</p>
+
 # libjoint
 
 [![C99](https://img.shields.io/badge/C-C99-555?logo=c)](#)
 [![BSD-2-Clause](https://img.shields.io/badge/License-BSD--2--Clause-blue)](#)
-[![interval-tree](https://img.shields.io/badge/interval-tree-16A34A)](#)
+[![interval-tree](https://img.shields.io/badge/interval--tree-16A34A)](#)
+[![Recall Kernel Time Axis](https://img.shields.io/badge/axis-time-blueviolet)](#)
 
-> Interval-tree time presence library.
+> High-performance interval-tree temporal presence engine and recall kernel time axis.
 
 A high-performance C library for storing and querying time-based intervals,
 built on [corm](https://github.com/tty-pt/corm) for efficient sorted storage
