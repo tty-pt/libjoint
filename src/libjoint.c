@@ -43,7 +43,20 @@ static char *strptime(const char *s, const char *fmt, struct tm *tm) {
 #endif
 
 #define TI_DBS_MAX 512
-#define TI_MASK 0xFFFF
+#define TI_DEFAULT_MASK 0xFF
+
+static inline uint32_t
+joint_mask_effective(void)
+{
+	const char *e = getenv("CORM_MASK");
+	if (e && *e) {
+		char *end;
+		unsigned long v = strtoul(e, &end, 10);
+		if (*end == '\0' && v > 0 && (v & (v + 1)) == 0)
+			return (uint32_t)v;
+	}
+	return TI_DEFAULT_MASK;
+}
 
 enum cflags {
 	JOINT_AHEAD = 1, // first element
@@ -390,9 +403,10 @@ tidbs_init(struct tidbs *dbs, char *fname)
 	uint32_t flags = 0;  /* CM_MIRROR optional in corm v0.7.0+, not needed for persistence */
 
 	/* Only persist the primary 'ti' database; secondary indexes are in-memory only */
-	dbs->ti = corm_open(fname, "ti", qm_ti, qm_ti, TI_MASK, flags);
-	dbs->max = corm_open(NULL, NULL, qm_time, qm_ti, TI_MASK, CM_SORTED | CM_MULTIVALUE);
-	dbs->id = corm_open(NULL, NULL, qm_id, qm_ti, TI_MASK, CM_SORTED | CM_MULTIVALUE);
+	uint32_t mask = joint_mask_effective();
+	dbs->ti = corm_open(fname, "ti", qm_ti, qm_ti, mask, flags);
+	dbs->max = corm_open(NULL, NULL, qm_time, qm_ti, mask, CM_SORTED | CM_MULTIVALUE);
+	dbs->id = corm_open(NULL, NULL, qm_id, qm_ti, mask, CM_SORTED | CM_MULTIVALUE);
 
 	corm_cmp_set(qm_time, timax_cmp);
 
