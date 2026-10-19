@@ -17,7 +17,7 @@
 
 `libjoint` functions as the canonical **Time Axis** for temporal queries and recall composition:
 - **Storage Engine**: Built on sorted [libcorm](https://github.com/tty-pt/libcorm) maps for high-throughput temporal intervals.
-- **Cross-Axis Recall Kernel**: Composes temporal windows (`rec_axis_fill_interval`) with sibling axes: [libislet](https://github.com/tty-pt/libgeo) (Space), [libstoma](https://github.com/tty-pt/libstoma) (Text), and [libsepal](https://github.com/tty-pt/libsepal) (Meaning).
+- **Cross-Axis Recall Kernel**: Composes temporal windows (`rec_axis_fill_interval`) with sibling axes: [libislet](https://github.com/tty-pt/libgeo) (Space), [liblemma](https://github.com/tty-pt/liblemma) (Text), and [libsepal](https://github.com/tty-pt/libsepal) (Meaning).
 
 ---
 

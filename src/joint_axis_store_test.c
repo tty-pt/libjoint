@@ -1,6 +1,6 @@
 /* 2A-3 joint_erase + rec_axis_store/unstore/readback contract tests.
  * Self-checking (CHECK + summary, no expects.txt diff), like
- * stoma_axis_store_test.c. Covers the native erase differential
+ * lemma_axis_store_test.c. Covers the native erase differential
  * (index -> erase -> zero residual intervals, neighbors unaffected)
  * and the four-form adapter grammar incl. exact-duplicate no-ops. */
 

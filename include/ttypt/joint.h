@@ -19,7 +19,7 @@
  * ID-uniformity contract (see RECALL-KERNEL.md):
  * entity ids are stored and compared internally as `unsigned` (32-bit) --
  * this is intentional, not a gap. The uniformity boundary other axis
- * libraries (libsepal, libstoma) share is `rec_ref_t` (uint32_t, from
+ * libraries (libsepal, liblemma) share is `rec_ref_t` (uint32_t, from
  * rec.h), and it is enforced at the *fill* boundary only:
  * rec_axis_fill_interval() widens every `who` to `rec_ref_t` before
  * pushing it into the caller's rec_set_t. Internal storage width is each
