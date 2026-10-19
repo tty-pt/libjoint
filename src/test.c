@@ -10,7 +10,7 @@
 #include <stdint.h>
 
 #include <ttypt/qsys.h>
-#include <ttypt/rec.h>
+#include <ttypt/corm.h>
 
 extern const struct rec_axis_cli_option *rec_axis_cli_options(void);
 extern int rec_axis_config_arg(const char *name, const char *value);

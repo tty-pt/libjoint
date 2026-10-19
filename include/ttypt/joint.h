@@ -32,7 +32,7 @@
 
 #include <time.h>
 #include <sys/types.h>
-#include <ttypt/rec.h>
+#include <ttypt/corm.h>
 
 /**
  * @brief Maximum length for ISO-8601 date string buffers.

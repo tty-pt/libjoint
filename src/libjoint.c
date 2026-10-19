@@ -14,7 +14,7 @@
 #include <ttypt/corm.h>
 #include <ttypt/idm.h>
 #include <ttypt/qsys.h>
-#include <ttypt/rec.h>
+#include <ttypt/corm.h>
 
 #ifdef _WIN32
 static char *strptime(const char *s, const char *fmt, struct tm *tm) {
