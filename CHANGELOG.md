@@ -5,6 +5,12 @@ All notable changes to libjoint will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.4.0
+
+- **Cormr Recall Kernel Integration**: Updated to consume `<ttypt/corm.h>` and `<ttypt/cormr.h>`, aligning with the domain-free Recall Kernel architecture.
+- **Lemma Text Indexing Alignment**: Updated ecosystem references and test fixtures from `libstoma` to `liblemma`.
+- **Memory Footprint Optimization**: Scaled down initial allocation footprints for interval and split buffers.
+
 ## 1.3.0
 
 - **Renamed `libit` → `libjoint`**: the `it_*` API is now `joint_*` (`include/ttypt/joint.h`, `it.pc` → `joint.pc`; `LIBIT_LIMITATIONS.md` → `JOINT_LIMITATIONS.md`). Renames span the whole walker/splitter read model while the interval-tree semantics stay intact.
