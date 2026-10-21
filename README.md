@@ -13,6 +13,19 @@
 
 ---
 
+## Why libjoint? (Who Was Where, When, and With Whom?)
+
+Consider auditing a facility access log or multiplayer game world:
+> *"An incident occurred in the vault between 2:10 PM and 2:25 PM. Who else was in the room at the same time?"*
+
+Traditional databases evaluate time by testing millions of discrete timestamps or running expensive pairwise interval overlap queries ($O(N^2)$).
+
+`libjoint` takes an interval-tree approach:
+- **Instant Co-Presence Detection**: Slices continuous time spans into maximal constant-presence segments. It directly answers point presence, co-presence, concurrency, and temporal gaps in a single linear forward pass.
+- **Microsecond Query Latency**: Allocates zero dynamic memory per match or gap, making it ideal for tight server loops, audit engines, and real-time multiplayer tracking.
+
+---
+
 ## Recall Kernel (Time Axis)
 
 `libjoint` functions as the canonical **Time Axis** for temporal queries and recall composition:
