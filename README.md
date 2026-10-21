@@ -17,7 +17,26 @@
 
 `libjoint` functions as the canonical **Time Axis** for temporal queries and recall composition:
 - **Storage Engine**: Built on sorted [libcorm](https://github.com/tty-pt/libcorm) maps for high-throughput temporal intervals.
-- **Cross-Axis Recall Kernel**: Composes temporal windows (`rec_axis_fill_interval`) with sibling axes: [libislet](https://github.com/tty-pt/libgeo) (Space), [liblemma](https://github.com/tty-pt/liblemma) (Text), and [libsepal](https://github.com/tty-pt/libsepal) (Meaning).
+- **Cross-Axis Recall Kernel**: Composes temporal windows directly with sibling axes: [libislet](https://github.com/tty-pt/libislet) (Space), [liblemma](https://github.com/tty-pt/liblemma) (Text), and [libsepal](https://github.com/tty-pt/libsepal) (Meaning). Matches stream into `cormr_set_t` candidate pools via `rec_axis_fill_interval()`.
+
+---
+
+## Constant-Presence Segment Decomposition
+
+Unlike traditional databases that test points sequentially, `libjoint` segments query intervals into maximal **constant-presence slices**:
+
+```
+Time ──►  1000        1200      1500      1800      2000      2500
+Entity 1: [=================================)
+Entity 2:                       [=============================)
+
+Query Window:         [─────────────────]
+Decomposed Slices:
+  Slice A: [1200, 1500) -> Entity 1 only              (concurrency: 1)
+  Slice B: [1500, 1800) -> Entity 1 AND Entity 2      (concurrency: 2 - overlap)
+```
+
+Point presence, co-presence, concurrency counts, and temporal gaps are resolved in a single forward pass without secondary lookups.
 
 ---
 
@@ -76,7 +95,7 @@ cc presence_query.c $(pkg-config --cflags --libs joint)
 
 ---
 
-## Design Philosophy: Constant-Presence Slices
+## Design Philosophy: Constraints as Superpowers
 
 * **Microsecond Segment Decomposition**: Queries decompose time ranges into maximal constant-presence segments, answering point presence, co-presence, concurrency, and temporal gaps in a single linear pass.
 * **Ephemeral Arena Allocations**: The query engine allocates zero dynamic memory per match or gap, avoiding malloc overhead during tight server loops.
