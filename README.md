@@ -103,6 +103,7 @@ cc presence_query.c $(pkg-config --cflags --libs joint)
 | `joint_iter` | `joint_cur_t joint_iter(jd, time_t a, time_t b)` | Create query cursor decomposed into constant-presence slices |
 | `joint_next` | `int joint_next(&min, &max, &count, &who, &cur)` | Advance iterator returning active entities per time slice |
 | `rec_axis_fill_interval` | `int rec_axis_fill_interval(jd, a, b, set)` | Stream all active refs in `[a, b)` into a sealed recall candidate set |
+| `rec_axis_store_typed` | `int rec_axis_store_typed(ref, data, len, qtype, ctx)` | Ingest typed ISO 8601 dates and epoch intervals from HTOK containers |
 
 👉 *For boundary specifications, interval grammar, and worked patterns, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md) and [JOINT_LIMITATIONS.md](JOINT_LIMITATIONS.md).*
 

@@ -881,13 +881,13 @@ TEST(persist_save_load) {
 	int found;
 	
 	/* Create database with data */
-	itd1 = joint_init("/tmp/test_persist.db");
+	itd1 = joint_init("/tmp/joint_persist.db");
 	joint_start(itd1, 1000, 42);
 	joint_stop(itd1, 2000, 42);
 	joint_close(itd1); /* Close to persist data */
 	
 	/* Load database in new handle */
-	itd2 = joint_init("/tmp/test_persist.db");
+	itd2 = joint_init("/tmp/joint_persist.db");
 	
 	/* Verify data persisted */
 	cur = joint_iter(itd2, 500, 2500);
@@ -911,7 +911,7 @@ TEST(persist_multiple_intervals) {
 	int found_count;
 	
 	/* Create database with multiple intervals */
-	itd1 = joint_init("/tmp/test_persist_multi.db");
+	itd1 = joint_init("/tmp/joint_persist_multi.db");
 	joint_start(itd1, 1000, 1);
 	joint_stop(itd1, 2000, 1);
 	joint_start(itd1, 3000, 2);
@@ -921,7 +921,7 @@ TEST(persist_multiple_intervals) {
 	joint_close(itd1); /* Close to persist data */
 	
 	/* Reload */
-	itd2 = joint_init("/tmp/test_persist_multi.db");
+	itd2 = joint_init("/tmp/joint_persist_multi.db");
 	
 	/* Count intervals */
 	cur = joint_iter(itd2, 0, 7000);
@@ -943,11 +943,11 @@ TEST(persist_empty_database) {
 	int has_results;
 	
 	/* Create empty database */
-	itd1 = joint_init("/tmp/test_persist_empty.db");
+	itd1 = joint_init("/tmp/joint_persist_empty.db");
 	joint_close(itd1); /* Close to persist data */
 	
 	/* Reload */
-	itd2 = joint_init("/tmp/test_persist_empty.db");
+	itd2 = joint_init("/tmp/joint_persist_empty.db");
 	
 	/* Should be empty */
 	cur = joint_iter(itd2, 0, 10000);
@@ -965,19 +965,19 @@ TEST(persist_append) {
 	int found_count;
 	
 	/* Create initial data */
-	itd1 = joint_init("/tmp/test_persist_append.db");
+	itd1 = joint_init("/tmp/joint_persist_append.db");
 	joint_start(itd1, 1000, 1);
 	joint_stop(itd1, 2000, 1);
 	joint_close(itd1); /* Close to persist data */
 	
 	/* Reload and add more */
-	itd2 = joint_init("/tmp/test_persist_append.db");
+	itd2 = joint_init("/tmp/joint_persist_append.db");
 	joint_start(itd2, 3000, 2);
 	joint_stop(itd2, 4000, 2);
 	joint_close(itd2); /* Close to persist data */
 	
 	/* Reload again and verify both intervals exist */
-	itd3 = joint_init("/tmp/test_persist_append.db");
+	itd3 = joint_init("/tmp/joint_persist_append.db");
 	cur = joint_iter(itd3, 0, 5000);
 	found_count = 0;
 	
@@ -997,7 +997,7 @@ TEST(persist_large_dataset) {
 	int found_count;
 	
 	/* Create large dataset */
-	itd1 = joint_init("/tmp/test_persist_large.db");
+	itd1 = joint_init("/tmp/joint_persist_large.db");
 	for (i = 0; i < 50; i++) {
 		joint_start(itd1, 1000 + i * 100, i + 1);
 		joint_stop(itd1, 1050 + i * 100, i + 1);
@@ -1005,7 +1005,7 @@ TEST(persist_large_dataset) {
 	joint_close(itd1); /* Close to persist data */
 	
 	/* Reload */
-	itd2 = joint_init("/tmp/test_persist_large.db");
+	itd2 = joint_init("/tmp/joint_persist_large.db");
 	
 	/* Count intervals */
 	cur = joint_iter(itd2, 0, 10000);
