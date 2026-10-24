@@ -1,10 +1,16 @@
 #define _DEFAULT_SOURCE
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #ifndef __OpenBSD__
 #define _XOPEN_SOURCE
 #endif
 #include "../include/ttypt/joint.h"
 
 #include <errno.h>
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1311,23 +1317,17 @@ void *rec_axis_open(const char *spec)
  * no comma -> open (exact date or leading-date prefix); ",B" ->
  * close-or-backfill; "A,B" with B>A -> atomic; else EINVAL.
  */
-int
-rec_axis_store(void *ctx, const char *spec, rec_ref_t ref, const char *value)
+static int
+joint_store_impl(unsigned jd, rec_ref_t ref, const char *value)
 {
-	unsigned jd = (unsigned)(uintptr_t)ctx;
 	const char *comma;
 	int rc;
 
-	(void)spec; /* reserved — NULL */
-	if (!ctx || !value) {
+	if (!value || !*value) {
 		errno = EINVAL;
 		return -1;
 	}
 	if (ref == UINT32_MAX) {
-		errno = EINVAL;
-		return -1;
-	}
-	if (!*value) { /* an empty string opens nothing: loud reject */
 		errno = EINVAL;
 		return -1;
 	}
@@ -1390,6 +1390,110 @@ rec_axis_store(void *ctx, const char *spec, rec_ref_t ref, const char *value)
 		rc = joint_stop(jd, tb, ref);
 		return (rc < 0) ? -1 : 0;
 	}
+}
+
+int
+rec_axis_store(void *ctx, const char *spec, rec_ref_t ref, const char *value)
+{
+	(void)spec;
+	if (!ctx) {
+		errno = EINVAL;
+		return -1;
+	}
+	return joint_store_impl((unsigned)(uintptr_t)ctx, ref, value);
+}
+
+#define HTOK_MAGIC 0x48544F4B
+
+int
+rec_axis_store_typed(void *ctx, const char *spec, rec_ref_t ref,
+                     const void *blob, size_t len, uint32_t qtype)
+{
+	(void)spec;
+	if (!ctx || !blob || len == 0 || ref == UINT32_MAX) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (qtype == CM_STR) {
+		return rec_axis_store(ctx, spec, ref, (const char *)blob);
+	}
+
+	unsigned jd = (unsigned)(uintptr_t)ctx;
+
+	if (len >= 8 && *(const uint32_t *)blob == HTOK_MAGIC) {
+		uint16_t version = *(const uint16_t *)((const uint8_t *)blob + 4);
+		if (version >= 2 && len >= 14) {
+			uint32_t ts = *(const uint32_t *)((const uint8_t *)blob + 6);
+			if (ts > 0) {
+				if (joint_has_interval(jd, ref, (time_t)ts, tinf))
+					return 0;
+				int rc = joint_start(jd, (time_t)ts, ref);
+				return (rc < 0) ? -1 : 0;
+			}
+			return 0;
+		}
+
+		const uint8_t *p = (const uint8_t *)blob + 4;
+		const uint8_t *end = (const uint8_t *)blob + len;
+		uint16_t field_count = 0;
+
+		if (p + 4 > end) return -1;
+		p += 2; /* skip version */
+		memcpy(&field_count, p, 2); p += 2;
+
+		for (uint16_t i = 0; i < field_count && p < end; i++) {
+			if (p + 1 > end) break;
+			uint8_t nlen = *p++;
+			if (p + nlen + 2 > end) break;
+			char fname[64];
+			size_t copylen = nlen < sizeof(fname) - 1 ? nlen : sizeof(fname) - 1;
+			memcpy(fname, p, copylen);
+			fname[copylen] = '\0';
+			p += nlen;
+
+			uint16_t ntok = 0;
+			memcpy(&ntok, p, 2); p += 2;
+			if (p + (size_t)ntok * 2 > end) break;
+
+			const uint16_t *tokens = (const uint16_t *)p;
+			p += (size_t)ntok * 2;
+
+			if (strcmp(fname, "date") == 0 || strcmp(fname, "time") == 0) {
+				char date_str[128];
+				size_t bw = 0;
+				typedef int (*lemma_tok_decode_fn)(const void *vocab, const uint16_t *tokens, size_t n_tokens,
+				                                   char *dst, size_t dst_cap, size_t *bytes_written);
+				lemma_tok_decode_fn decode_fn = NULL;
+#ifndef _WIN32
+				void *sym = dlsym(RTLD_DEFAULT, "lemma_tok_decode");
+				memcpy(&decode_fn, &sym, sizeof(decode_fn));
+#endif
+				if (decode_fn && decode_fn(NULL, tokens, ntok, date_str, sizeof(date_str), &bw) == 0 && bw > 0) {
+					time_t ts;
+					if (joint_date_parse(date_str, &ts, 0) == 0 ||
+					    joint_date_parse(date_str, &ts, 1) == 0) {
+						if (joint_has_interval(jd, ref, ts, tinf))
+							return 0;
+						int rc = joint_start(jd, ts, ref);
+						return (rc < 0) ? -1 : 0;
+					}
+				}
+			}
+		}
+		return 0;
+	}
+
+	/* Fallback: text payload stored in blob slot */
+	char *tmp = malloc(len + 1);
+	if (tmp) {
+		memcpy(tmp, blob, len);
+		tmp[len] = '\0';
+		int rc = joint_store_impl(jd, ref, tmp);
+		free(tmp);
+		return rc;
+	}
+
+	return -1;
 }
 
 int
