@@ -14,6 +14,8 @@ add-prefix := ../libcorm ../liblemma
 CFLAGS-x86_64 := -mpopcnt -mavx2 -mfma
 CFLAGS-amd64 := -mpopcnt -mavx2 -mfma
 
+INSTALL_BIN :=
+
 include ../mk/include.mk
 
 test: all

@@ -5,6 +5,12 @@ All notable changes to libjoint will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1]
+
+- **Packaging & Installation Purity (`INSTALL_BIN`)**:
+  - Explicitly cleared `INSTALL_BIN :=` in `Makefile` so that `make install` installs only `libjoint.so`, headers, manpages, and `joint.pc`.
+  - Prevents internal test binaries (`bin/test`, `bin/test_extended`, `bin/joint_axis_store_test`, `bin/joint_axis_roundtrip_test`) from being installed into `/usr/bin/`, eliminating packaging conflicts with `coreutils`/`coreutils-from-uutils` (`/usr/bin/test`).
+
 ## [1.6.0]
 
 <p align="center">
