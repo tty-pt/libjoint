@@ -90,7 +90,17 @@ Point presence, co-presence, concurrency counts, and temporal gaps are resolved 
 
 ---
 
-## 4. Recall Kernel (Time Axis)
+## 4. `corm` CLI Multi-Axis Integration
+
+`libjoint` attaches directly to the `corm` CLI tool as the `@joint` temporal axis:
+
+```bash
+# Ingest entity timestamp presence window:
+corm -p "2026-10-27T14:30:00Z" audit.db@joint:a:s
+
+# Query presence over temporal range:
+corm -X "joint" --joint="range:1730000000..1730003600" audit.db@joint:a:s
+```
 
 `libjoint` functions as the canonical **Time Axis** for temporal queries and recall composition:
 - **Storage Engine**: Built on sorted [libcorm](https://github.com/tty-pt/libcorm) maps for high-throughput temporal intervals.
