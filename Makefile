@@ -23,3 +23,19 @@ test: all
 
 bench: all
 	LD_LIBRARY_PATH=lib:$(LD_LIBRARY_PATH) ./bin/test_extended 2>&1 | grep -E 'µs|PASS|FAIL|ALL|==='
+
+# Optional Node.js & WebAssembly bindings
+NPM ?= npm
+
+npm-build:
+	@if command -v $(NPM) >/dev/null 2>&1; then \
+		(cd npm && $(NPM) run build); \
+	else \
+		echo "Skipping npm build — $(NPM) not found"; \
+	fi
+
+npm-test: npm-build
+	@if command -v $(NPM) >/dev/null 2>&1; then \
+		(cd npm && $(NPM) test); \
+	fi
+

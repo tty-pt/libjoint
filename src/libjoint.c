@@ -459,6 +459,8 @@ ti_finish_last(struct tidbs *dbs, uint32_t id, time_t end)
 		return;  /* No intervals for this entity at all */
 
 	while (corm_next(&key, &value, c)) {
+		if (!value)
+			continue;
 		memcpy(&ti, value, sizeof(ti));
 
 		/* Find the open interval (max=tinf) for this entity */
@@ -498,6 +500,8 @@ ti_intersect(struct tidbs *dbs, struct match_arena *matches, time_t min, time_t 
 	uint32_t c = corm_iter(dbs->max, &min, CM_RANGE | CM_RANGE_GE);
 
 	while (corm_next(&key, &value, c)) {
+		if (!value)
+			continue;
 		memcpy(&tmp, value, sizeof(struct ti));
 
 		if (tmp.max >= min && tmp.min < max) {
@@ -527,6 +531,8 @@ ti_present(struct tidbs *dbs, time_t when, uint32_t who) {
 		return ret;  /* No intervals for this entity at all */
 
 	while (corm_next(&key, &value, c)) {
+		if (!value)
+			continue;
 		memcpy(&tmp, value, sizeof(struct ti));
 		
 		if (tmp.who == who && tmp.max > when && tmp.min <= when) {

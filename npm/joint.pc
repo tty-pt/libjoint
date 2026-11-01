@@ -1,0 +1,10 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: joint
+Description: Easy interval tree library
+Version: 1.6.1
+Libs: -ljoint -lcorm -lqsys
+Cflags:

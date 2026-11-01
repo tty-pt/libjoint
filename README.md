@@ -4,56 +4,17 @@
 
 # libjoint
 
+[![npm](https://img.shields.io/badge/npm-@ttypt/joint-CB3837?logo=npm)](npm/README.md)
 [![C99](https://img.shields.io/badge/C-C99-555?logo=c)](#)
 [![BSD-2-Clause](https://img.shields.io/badge/License-BSD--2--Clause-blue)](#)
 [![interval-tree](https://img.shields.io/badge/interval--tree-16A34A)](#)
 [![Recall Kernel Time Axis](https://img.shields.io/badge/axis-time-blueviolet)](#)
 
-> Interval-tree temporal presence engine for querying who was where, when, and with whom across historical time windows in pure C.
+> Interval-tree temporal presence engine for querying who was where, when, and with whom across historical time windows in pure C. Canonical header is `<ttypt/joint.h>`.
 
 ---
 
-## Why libjoint? (Who Was Where, When, and With Whom?)
-
-Consider auditing a facility access log or multiplayer game world:
-> *"An incident occurred in the vault between 2:10 PM and 2:25 PM. Who else was in the room at the same time?"*
-
-Traditional databases evaluate time by testing millions of discrete timestamps or running expensive pairwise interval overlap queries ($O(N^2)$).
-
-`libjoint` takes an interval-tree approach:
-- **Instant Co-Presence Detection**: Slices continuous time spans into maximal constant-presence segments. It directly answers point presence, co-presence, concurrency, and temporal gaps in a single linear forward pass.
-- **Microsecond Query Latency**: Allocates zero dynamic memory per match or gap, making it ideal for tight server loops, audit engines, and real-time multiplayer tracking.
-
----
-
-## Recall Kernel (Time Axis)
-
-`libjoint` functions as the canonical **Time Axis** for temporal queries and recall composition:
-- **Storage Engine**: Built on sorted [libcorm](https://github.com/tty-pt/libcorm) maps for high-throughput temporal intervals.
-- **Cross-Axis Recall Kernel**: Composes temporal windows directly with sibling axes: [libislet](https://github.com/tty-pt/libislet) (Space), [liblemma](https://github.com/tty-pt/liblemma) (Text), and [libsepal](https://github.com/tty-pt/libsepal) (Meaning). Matches stream into `cormr_set_t` candidate pools via `rec_axis_fill_interval()`.
-
----
-
-## Constant-Presence Segment Decomposition
-
-Unlike traditional databases that test points sequentially, `libjoint` segments query intervals into maximal **constant-presence slices**:
-
-```
-Time ──►  1000        1200      1500      1800      2000      2500
-Entity 1: [=================================)
-Entity 2:                       [=============================)
-
-Query Window:         [─────────────────]
-Decomposed Slices:
-  Slice A: [1200, 1500) -> Entity 1 only              (concurrency: 1)
-  Slice B: [1500, 1800) -> Entity 1 AND Entity 2      (concurrency: 2 - overlap)
-```
-
-Point presence, co-presence, concurrency counts, and temporal gaps are resolved in a single forward pass without secondary lookups.
-
----
-
-## Quickstart
+## 1. Quickstart
 
 Record entity presence windows and query concurrent overlaps in under 20 lines:
 
@@ -88,12 +49,14 @@ int main(void) {
 
 Compile and link:
 ```sh
-cc presence_query.c $(pkg-config --cflags --libs joint)
+cc presence_query.c $(pkg-config --cflags --libs libjoint) -o presence_query
 ```
 
 ---
 
-## Core API (The Essential 20%)
+## 2. Core API Reference
+
+The essential functions for temporal presence recording and interval overlap queries:
 
 | Function | Signature | Description |
 | :--- | :--- | :--- |
@@ -105,19 +68,48 @@ cc presence_query.c $(pkg-config --cflags --libs joint)
 | `rec_axis_fill_interval` | `int rec_axis_fill_interval(jd, a, b, set)` | Stream all active refs in `[a, b)` into a sealed recall candidate set |
 | `rec_axis_store_typed` | `int rec_axis_store_typed(ref, data, len, qtype, ctx)` | Ingest typed ISO 8601 dates and epoch intervals from HTOK containers |
 
-👉 *For boundary specifications, interval grammar, and worked patterns, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md) and [JOINT_LIMITATIONS.md](JOINT_LIMITATIONS.md).*
+👉 *For boundary specifications, interval grammar, and worked patterns, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md).*
 
 ---
 
-## Design Philosophy: Constraints as Superpowers
+## 3. Constant-Presence Segment Decomposition
 
-* **Microsecond Segment Decomposition**: Queries decompose time ranges into maximal constant-presence segments, answering point presence, co-presence, concurrency, and temporal gaps in a single linear pass.
-* **Ephemeral Arena Allocations**: The query engine allocates zero dynamic memory per match or gap, avoiding malloc overhead during tight server loops.
-* **Predictable Boundaries**: Up to 65,536 intervals per database with support for up to 4,096 concurrent overlapping entities.
+Unlike traditional databases that test individual timestamps sequentially, `libjoint` segments query intervals into maximal **constant-presence slices**:
+
+```
+Time ──►  1000        1200      1500      1800      2000      2500
+Entity 1: [=================================)
+Entity 2:                       [=============================)
+
+Query Window:         [─────────────────]
+Decomposed Slices:
+  Slice A: [1200, 1500) -> Entity 1 only              (concurrency: 1)
+  Slice B: [1500, 1800) -> Entity 1 AND Entity 2      (concurrency: 2 - overlap)
+```
+
+Point presence, co-presence, concurrency counts, and temporal gaps are resolved in a single forward pass without secondary lookups.
 
 ---
 
-## Installation & Build
+## 4. `corm` CLI Multi-Axis Integration
+
+`libjoint` attaches directly to the `corm` CLI tool as the `@joint` temporal axis:
+
+```bash
+# Ingest entity timestamp presence window:
+corm -p "2026-10-27T14:30:00Z" audit.db@joint:a:s
+
+# Query presence over temporal range:
+corm -X "joint" --joint="range:1730000000..1730003600" audit.db@joint:a:s
+```
+
+`libjoint` functions as the canonical **Time Axis** for temporal queries and recall composition:
+- **Storage Engine**: Built on sorted [libcorm](https://github.com/tty-pt/libcorm) maps for high-throughput temporal intervals.
+- **Cross-Axis Recall Kernel**: Composes temporal windows directly with sibling axes: [libislet](https://github.com/tty-pt/libislet) (Space), [liblemma](https://github.com/tty-pt/liblemma) (Text), and [libsepal](https://github.com/tty-pt/libsepal) (Meaning). Matches stream into `cormr_set_t` candidate pools via `rec_axis_fill_interval()`.
+
+---
+
+## 5. Installation & Build
 
 ### Prebuilt Packages
 Prebuilt packages are distributed on tty.pt for Linux (APT / Alpine / Arch / Fedora-RHEL), macOS (Homebrew), Windows (winget / MSYS2), and OpenBSD. Follow the [installation instructions](https://github.com/tty-pt/ci/blob/main/docs/install.md) and use **libjoint** as the package name.
@@ -129,6 +121,17 @@ make test             # run comprehensive test suite
 make bench            # run microsecond query benchmarks
 sudo make install     # install headers and library to system
 ```
+
+---
+
+## 6. JavaScript & WebAssembly Bindings (@ttypt/joint)
+
+Official Node.js and Browser WebAssembly bindings are colocated in [`npm/`](npm/README.md):
+- **Universal Engine**: Native Node-API (`.node`) for backend scheduling and pre-compiled WebAssembly (`dist/joint.wasm`) for client-side calendar UIs.
+- **Reactive Timeline Controller**: Provides 60/120 FPS conflict tracking on mouse drag/sliders with zero external framework dependencies.
+- **C Development Headers**: Install via `npm install @ttypt/joint` and consume headers from `node_modules/@ttypt/joint/include`.
+
+👉 *For complete TypeScript usage, reactive timeline controllers, and API reference, see [npm/README.md](npm/README.md).*
 
 ## License
 

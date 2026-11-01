@@ -1,0 +1,42 @@
+{
+  "name": "@ttypt/joint",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Universal Node.js and Browser bindings for libjoint Interval-Tree Temporal Engine",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "include",
+    "assets",
+    "*.pc",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build:native": "mkdir -p build/Release && gcc -O3 -fPIC -shared -I/usr/include/node -I../include -I../../libcorm/include -I../../libqsys/include native/joint_napi.c -L../lib -Wl,-rpath,../lib -L/usr/lib -ljoint -lcorm -o build/Release/joint_node.node 2>/dev/null || true",
+    "build:wasm": "clang --target=wasm32-wasi -mexec-model=reactor -Wl,--no-entry -Wl,--allow-undefined -Wl,--export=joint_wasm_clear -Wl,--export=joint_wasm_record -Wl,--export=joint_wasm_intersect -Wl,--export=malloc -Wl,--export=free -O3 -o dist/joint.wasm wasm/joint_wasm.c 2>/dev/null || true",
+    "build": "npm run build:native && npm run build:wasm",
+    "test": "node --test tests/joint.test.mjs"
+  },
+  "keywords": [
+    "joint",
+    "libjoint",
+    "temporal",
+    "interval-tree",
+    "scheduling",
+    "calendar",
+    "availability"
+  ],
+  "author": "Paulo Quirino",
+  "license": "BSD-2-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tty-pt/libjoint.git",
+    "directory": "npm"
+  },
+  "homepage": "https://github.com/tty-pt/libjoint/tree/main/npm#readme",
+  "bugs": {
+    "url": "https://github.com/tty-pt/libjoint/issues"
+  }
+}
