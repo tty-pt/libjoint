@@ -19,7 +19,7 @@
 #include <ttypt/queue.h>
 #include <ttypt/corm.h>
 #include <ttypt/idm.h>
-#include <ttypt/qsys.h>
+#include <ttypt/stele.h>
 #include <ttypt/corm.h>
 
 #ifdef _WIN32

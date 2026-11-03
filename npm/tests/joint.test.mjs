@@ -53,3 +53,24 @@ test("createTimelineController provides reactive interval conflict tracking", ()
 
   unsubscribe();
 });
+
+test("withOverlaps zero-copy raw memory pointer query", () => {
+  const tmpFile = path.join("/tmp", `test_overlap_${Date.now()}.joint`);
+  const timeline = new JointTimeline(tmpFile);
+  timeline.recordInterval(301, 1000, 2000);
+  timeline.recordInterval(302, 1500, 2500);
+
+  timeline.withOverlaps(1200, 1800, (ptr, count) => {
+    assert.ok(count >= 2);
+    assert.ok(ptr > 0);
+  });
+
+  assert.ok(timeline.count(1200, 1800) >= 2);
+  const raw = timeline.rawPointer(1200, 1800);
+  assert.ok(raw.ptr > 0);
+  assert.ok(raw.count >= 2);
+  raw.free();
+
+  timeline.close();
+  try { fs.unlinkSync(tmpFile); } catch {}
+});
