@@ -396,7 +396,7 @@ LD_LIBRARY_PATH=./lib ./bin/test_extended
 gcc -o myapp myapp.c -I/path/to/libjoint/include
 
 # Link against libjoint and dependencies
-gcc -o myapp myapp.o -L/path/to/libjoint/lib -ljoint -lcorm -lqsys
+gcc -o myapp myapp.o -L/path/to/libjoint/lib -ljoint -lcorm -lstele
 ```
 
 Or use pkg-config:
@@ -413,7 +413,7 @@ gcc -o myapp myapp.c $(pkg-config --cflags --libs joint)
 ## Version Info
 
 - **Version**: libjoint v1.2.1
-- **Dependencies**: corm v0.7.0+, qsys
+- **Dependencies**: corm v0.7.0+, stele
 - **Status**: Production-ready with full persistence support
 - **Features**: 65k intervals, 4k overlaps, input validation, file persistence
 - **License**: BSD-2-Clause

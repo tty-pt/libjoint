@@ -5,6 +5,16 @@ All notable changes to libjoint will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-11-03
+
+- **Zero-Copy Shared Memory Chaining (`JointTimeline`)**:
+  - Added `.count(start, end)`, `.rawPointer(start, end)` returning `{ ptr, count, free }`, and `.withOverlaps(start, end, fn)`.
+  - Enables zero-copy raw memory pointer queries across shared WebAssembly linear memory (`-Wl,--import-memory`), directly seeding `@tty-pt/corm`'s `CandidateSet` and rankers.
+- **Standalone `@tty-pt/joint` Package & Centralized Build**:
+  - Published `@tty-pt/joint` providing Node-API native bindings and pure WebAssembly fallback (`joint.wasm`).
+  - Added `npm/wasm/joint_wasm.c` using `ISO_EXPORT` for automatic symbol export.
+  - Centralized WASM compilation in `external/mk/include.mk` (`make wasm`) with post-link `wasm-opt -O3` optimization (dropping binary size from 45 KB to 36 KB).
+
 ## [1.6.1]
 
 - **Packaging & Installation Purity (`INSTALL_BIN`)**:
@@ -217,7 +227,7 @@ Performance remains excellent with increased limits:
 - Update .gitignore with build artifact and test file patterns (/bin, /*.db, /*.corm, /man)
 - Add Doxygen support for automatic man page generation
 - Enhance API documentation in joint.h with comprehensive Doxygen comments
-- Update dependencies in joint.pc (libcorm, libqsys instead of libqdb, libdb)
+- Update dependencies in joint.pc (libcorm, libstele instead of libqdb, libdb)
 - Establish CHANGELOG for version tracking
 
 ### Fixed

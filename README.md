@@ -4,7 +4,7 @@
 
 # libjoint
 
-[![npm](https://img.shields.io/badge/npm-@ttypt/joint-CB3837?logo=npm)](npm/README.md)
+[![npm](https://img.shields.io/badge/npm-@tty-pt/joint-CB3837?logo=npm)](npm/README.md)
 [![C99](https://img.shields.io/badge/C-C99-555?logo=c)](#)
 [![BSD-2-Clause](https://img.shields.io/badge/License-BSD--2--Clause-blue)](#)
 [![interval-tree](https://img.shields.io/badge/interval--tree-16A34A)](#)
@@ -124,12 +124,12 @@ sudo make install     # install headers and library to system
 
 ---
 
-## 6. JavaScript & WebAssembly Bindings (@ttypt/joint)
+## 6. JavaScript & WebAssembly Bindings (@tty-pt/joint)
 
 Official Node.js and Browser WebAssembly bindings are colocated in [`npm/`](npm/README.md):
 - **Universal Engine**: Native Node-API (`.node`) for backend scheduling and pre-compiled WebAssembly (`dist/joint.wasm`) for client-side calendar UIs.
 - **Reactive Timeline Controller**: Provides 60/120 FPS conflict tracking on mouse drag/sliders with zero external framework dependencies.
-- **C Development Headers**: Install via `npm install @ttypt/joint` and consume headers from `node_modules/@ttypt/joint/include`.
+- **C Development Headers**: Install via `npm install @tty-pt/joint` and consume headers from `node_modules/@tty-pt/joint/include`.
 
 👉 *For complete TypeScript usage, reactive timeline controllers, and API reference, see [npm/README.md](npm/README.md).*
 

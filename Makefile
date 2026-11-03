@@ -1,20 +1,22 @@
 all = libjoint test test_extended joint_axis_store_test ${all-extra-${SYS}}
 all-extra-Unix := joint_axis_roundtrip_test
 
-LDLIBS-libjoint := -lcorm -lqsys
-LDLIBS-test := -lcorm -lqsys -ljoint
-LDLIBS-test_extended := -lcorm -lqsys -ljoint
-LDLIBS-joint_axis_store_test := -lcorm -lqsys -ljoint
-LDLIBS-joint_axis_roundtrip_test := -lcorm -lqsys -ljoint
+LDLIBS-libjoint := -lcorm -lstele
+LDLIBS-test := -lcorm -lstele -ljoint
+LDLIBS-test_extended := -lcorm -lstele -ljoint
+LDLIBS-joint_axis_store_test := -lcorm -lstele -ljoint
+LDLIBS-joint_axis_roundtrip_test := -lcorm -lstele -ljoint
 
 CFLAGS += -g
 CFLAGS += -O3
-add-prefix := ../libcorm ../liblemma
 
 CFLAGS-x86_64 := -mpopcnt -mavx2 -mfma
 CFLAGS-amd64 := -mpopcnt -mavx2 -mfma
 
 INSTALL_BIN :=
+
+WASM_SRCS := npm/wasm/joint_wasm.c
+WASM_LDFLAGS += -Wl,--import-memory
 
 include ../mk/include.mk
 

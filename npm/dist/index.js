@@ -1,47 +1,12 @@
-import { createRequire } from "node:module";
-import path from "node:path";
+import { loadWasmModule, loadNativeAddon, getSubstrate } from "@tty-pt/stele";
 
-let nativeBinding = null;
-try {
-  const req = createRequire(import.meta.url);
-  try {
-    nativeBinding = req("../build/Release/joint_node.node");
-  } catch {}
-  if (!nativeBinding && typeof process !== "undefined" && process.platform && process.arch) {
-    try {
-      nativeBinding = req(`@ttypt/joint-${process.platform}-${process.arch}`);
-    } catch {}
-  }
-  if (!nativeBinding) {
-    try {
-      nativeBinding = req(path.join(process.cwd(), "build/Release/joint_node.node"));
-    } catch {}
-  }
-} catch {
-  // Native addon not available; in-memory / WASM fallback
-}
+const nativeBinding = loadNativeAddon(import.meta.url, "joint");
+let wasmInstance = null;
 
-function getSharedWasm() {
-  if (globalThis.__ttypt_shared_wasm__) {
-    return globalThis.__ttypt_shared_wasm__;
-  }
-  try {
-    const req = createRequire(import.meta.url);
-    const qsysPaths = [
-      path.join(path.dirname(import.meta.url.replace("file://", "")), "../../libqsys/npm/dist/index.js"),
-      path.join(process.cwd(), "node_modules/@ttypt/qsys/dist/index.js"),
-      "@ttypt/qsys"
-    ];
-    for (const p of qsysPaths) {
-      try {
-        const mod = req(p);
-        if (mod && mod.getSharedWasm) {
-          return mod.getSharedWasm();
-        }
-      } catch {}
-    }
-  } catch {}
-  return null;
+export function getJointWasm() {
+  if (wasmInstance) return wasmInstance;
+  wasmInstance = loadWasmModule(new URL("./joint.wasm", import.meta.url));
+  return wasmInstance;
 }
 
 /**
@@ -51,9 +16,8 @@ export class JointTimeline {
   constructor(filePath = "") {
     this.filePath = filePath;
     this.handle = null;
-    this._memIntervals = [];
 
-    if (nativeBinding) {
+    if (nativeBinding && nativeBinding.init) {
       this.handle = nativeBinding.init(this.filePath);
     }
   }
@@ -62,12 +26,8 @@ export class JointTimeline {
     if (nativeBinding && this.handle) {
       nativeBinding.record(this.handle, ref, start, end);
     } else {
-      const wasm = getSharedWasm();
-      if (wasm) {
-        wasm.joint_wasm_record(ref, BigInt(start), BigInt(end));
-      } else {
-        this._memIntervals.push({ ref, start, end });
-      }
+      const wasm = getJointWasm();
+      wasm.exports.joint_wasm_record(ref, BigInt(start), BigInt(end));
     }
   }
 
@@ -75,23 +35,100 @@ export class JointTimeline {
     if (nativeBinding && this.handle) {
       return nativeBinding.intersect(this.handle, start, end);
     }
-    const wasm = getSharedWasm();
-    if (wasm) {
-      const outPtr = wasm.malloc(4096);
-      const hits = wasm.joint_wasm_intersect(BigInt(start), BigInt(end), outPtr, 1024);
-      const arr = new Uint32Array(wasm.memory.buffer, outPtr, hits);
-      const res = Array.from(arr);
-      wasm.free(outPtr);
-      return res;
+    const wasm = getJointWasm();
+    const outPtr = wasm.exports.malloc(4096);
+    const hits = wasm.exports.joint_wasm_intersect(BigInt(start), BigInt(end), outPtr, 1024);
+    const mem = getSubstrate().memory.buffer;
+    const arr = new Uint32Array(mem, outPtr, hits);
+    const res = Array.from(arr);
+    wasm.exports.free(outPtr);
+    return res;
+  }
+
+  /**
+   * Returns count of matching intervals for a time range
+   * @param {number|bigint} [start]
+   * @param {number|bigint} [end]
+   * @returns {number}
+   */
+  count(start = 0, end = Number.MAX_SAFE_INTEGER) {
+    if (nativeBinding && this.handle) {
+      return this.queryOverlaps(start, end).length;
     }
-    const matching = [];
-    for (const item of this._memIntervals) {
-      // Overlap condition: start < item.end && end > item.start
-      if (start < item.end && end > item.start) {
-        if (!matching.includes(item.ref)) matching.push(item.ref);
+    const wasm = getJointWasm();
+    const outPtr = wasm.exports.malloc(4096);
+    const hits = wasm.exports.joint_wasm_intersect(BigInt(start), BigInt(end), outPtr, 1024);
+    wasm.exports.free(outPtr);
+    return Number(hits);
+  }
+
+  /**
+   * Returns a raw WASM memory pointer containing matching interval entity IDs.
+   * Allocates buffer in shared WASM memory and returns { ptr, count, free() }.
+   * @param {number|bigint} [start]
+   * @param {number|bigint} [end]
+   * @returns {{ ptr: number, count: number, free: () => void }}
+   */
+  rawPointer(start = 0, end = Number.MAX_SAFE_INTEGER) {
+    const wasm = getJointWasm();
+    if (nativeBinding && this.handle) {
+      const hits = this.queryOverlaps(start, end);
+      const ptr = wasm.exports.malloc(Math.max(hits.length * 4, 64));
+      const mem = getSubstrate().memory.buffer;
+      new Uint32Array(mem, ptr, hits.length).set(hits);
+      return {
+        ptr,
+        count: hits.length,
+        free: () => wasm.exports.free(ptr)
+      };
+    }
+    const ptr = wasm.exports.malloc(4096);
+    const hits = Number(wasm.exports.joint_wasm_intersect(BigInt(start), BigInt(end), ptr, 1024));
+    return {
+      ptr,
+      count: hits,
+      free: () => wasm.exports.free(ptr)
+    };
+  }
+
+  /**
+   * Zero-copy query: executes callback with raw WASM memory pointer and hit count
+   * directly from shared linear memory without JS array allocations.
+   * @param {number|bigint} start
+   * @param {number|bigint} end
+   * @param {(ptr: number, count: number) => any} fn
+   * @returns {any}
+   */
+  withOverlaps(start, end, fn) {
+    if (nativeBinding && this.handle) {
+      const hits = this.queryOverlaps(start, end);
+      const wasm = getJointWasm();
+      const outPtr = wasm.exports.malloc(Math.max(hits.length * 4, 64));
+      const mem = getSubstrate().memory.buffer;
+      new Uint32Array(mem, outPtr, hits.length).set(hits);
+      try {
+        return fn(outPtr, hits.length);
+      } finally {
+        wasm.exports.free(outPtr);
       }
     }
-    return matching;
+    const wasm = getJointWasm();
+    const outPtr = wasm.exports.malloc(4096);
+    const hits = wasm.exports.joint_wasm_intersect(BigInt(start), BigInt(end), outPtr, 1024);
+    try {
+      return fn(outPtr, hits);
+    } finally {
+      wasm.exports.free(outPtr);
+    }
+  }
+
+  clear() {
+    if (nativeBinding && this.handle) {
+      if (nativeBinding.clear) nativeBinding.clear(this.handle);
+    } else {
+      const wasm = getJointWasm();
+      wasm.exports.joint_wasm_clear();
+    }
   }
 
   close() {
@@ -99,7 +136,6 @@ export class JointTimeline {
       nativeBinding.close(this.handle);
       this.handle = null;
     }
-    this._memIntervals = [];
   }
 }
 
@@ -137,60 +173,34 @@ export class JointTemporalAxis {
 }
 
 /**
- * Framework-agnostic reactive timeline controller for per-frame 60/120 FPS collision feedback.
- * Zero external framework dependencies.
+ * Factory helper for reactive timeline controller
  */
 export function createTimelineController(timeline) {
-  let selectedRange = null;
+  let hasConflict = false;
   let conflicts = [];
-  const subscribers = new Set();
-
-  function notify() {
-    const state = {
-      selectedRange,
-      conflicts: [...conflicts],
-      hasConflict: conflicts.length > 0
-    };
-    for (const sub of subscribers) {
-      try {
-        sub(state);
-      } catch (err) {
-        console.error("Timeline subscriber error:", err);
-      }
-    }
-  }
+  const listeners = new Set();
 
   return {
-    get selectedRange() {
-      return selectedRange;
+    get hasConflict() {
+      return hasConflict;
     },
     get conflicts() {
-      return [...conflicts];
+      return conflicts;
     },
-    get hasConflict() {
-      return conflicts.length > 0;
+    subscribe(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
     },
     checkRange(start, end) {
-      selectedRange = { start, end };
       conflicts = timeline.queryOverlaps(start, end);
-      notify();
+      hasConflict = conflicts.length > 0;
+      for (const fn of listeners) fn({ hasConflict, conflicts });
       return conflicts;
     },
     clearRange() {
-      selectedRange = null;
       conflicts = [];
-      notify();
-    },
-    subscribe(callback) {
-      subscribers.add(callback);
-      callback({
-        selectedRange,
-        conflicts: [...conflicts],
-        hasConflict: conflicts.length > 0
-      });
-      return () => {
-        subscribers.delete(callback);
-      };
+      hasConflict = false;
+      for (const fn of listeners) fn({ hasConflict, conflicts });
     }
   };
 }

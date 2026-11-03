@@ -9,7 +9,7 @@
 #include <limits.h>
 #include <stdint.h>
 
-#include <ttypt/qsys.h>
+#include <ttypt/stele.h>
 #include <ttypt/corm.h>
 
 extern const struct rec_axis_cli_option *rec_axis_cli_options(void);

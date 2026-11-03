@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tty-pt/libjoint/main/assets/logo.png" alt="@ttypt/joint logo" width="220" />
+  <img src="https://raw.githubusercontent.com/tty-pt/libjoint/main/assets/logo.png" alt="@tty-pt/joint logo" width="220" />
 </p>
 
-# @ttypt/joint
+# @tty-pt/joint
 
 [![npm version](https://img.shields.io/badge/npm-v0.1.0-CB3837?logo=npm)](#)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD--2--Clause-blue)](#)
@@ -18,11 +18,11 @@
 ## 1. Quickstart
 
 ```bash
-npm install @ttypt/joint
+npm install @tty-pt/joint
 ```
 
 ```typescript
-import { JointTimeline, createTimelineController } from "@ttypt/joint";
+import { JointTimeline, createTimelineController } from "@tty-pt/joint";
 
 // 1. Initialize timeline (file-backed or in-memory)
 const timeline = new JointTimeline("./schedule.joint");
@@ -45,7 +45,7 @@ timeline.close();
 Provides 60/120 FPS real-time conflict tracking for interactive UI drag-and-drop calendars without any framework dependencies (works with vanilla DOM, React, Svelte, Vue):
 
 ```typescript
-import { JointTimeline, createTimelineController } from "@ttypt/joint";
+import { JointTimeline, createTimelineController } from "@tty-pt/joint";
 
 const timeline = new JointTimeline();
 timeline.recordInterval(201, 1000, 2000);
@@ -66,7 +66,35 @@ slider.addEventListener("input", (e) => {
 
 ---
 
-## 3. Dual-Engine Runtime
+## 3. JavaScript / TypeScript API Reference
+
+### `JointTimeline`
+C99 Interval-tree temporal presence engine wrapping `joint_node.node` / `joint.wasm`.
+* `constructor(filePath?: string)`: Initializes file-backed database or in-memory timeline.
+* `.recordInterval(ref: number, start: number, end: number): void`: Records half-open temporal interval $[start, end)$ for entity `ref`.
+* `.queryOverlaps(start: number, end: number): number[]`: Returns array of entity reference IDs overlapping the query window. Strictly executes in compiled WebAssembly / C without JavaScript loops.
+* `.clear(): void`: Clears all registered intervals.
+* `.close(): void`: Flushes changes and closes database handle.
+
+### `createTimelineController(timeline: JointTimeline)`
+Factory providing reactive state management for per-frame 60/120 FPS calendar sliders:
+* `hasConflict: boolean`: Current boolean conflict state.
+* `conflicts: number[]`: Array of conflicting entity reference IDs.
+* `.subscribe(fn: (state) => void): () => void`: Registers listener and returns unsubscribe function.
+* `.checkRange(start: number, end: number): number[]`: Recomputes overlaps for range and notifies subscribers.
+* `.clearRange(): void`: Clears range and resets conflict state.
+
+### `JointTemporalAxis`
+Plug-and-play CormAxis adapter for the Corm Recall Kernel (`@tty-pt/corm`):
+* `.registerInterval(ref: number, resourceId: number, start: number, end: number): void`
+* `.fill(params: { start: number, end: number, resourceId?: number }): number[]`
+
+### `getJointWasm(): WebAssembly.Instance`
+Returns the WebAssembly instance loaded on the Stele shared-memory substrate.
+
+---
+
+## 4. Dual-Engine Runtime
 
 - **Node.js**: Uses high-speed native C N-API addon (`build/Release/joint_node.node`) with persistent map indexing.
 - **Browser & Edge**: Runs pre-compiled `dist/joint.wasm` reactor with zero native compilation prerequisites.
@@ -77,7 +105,7 @@ slider.addEventListener("input", (e) => {
 
 ```makefile
 # Include in your C Makefile:
-CFLAGS += -I./node_modules/@ttypt/joint/include
+CFLAGS += -I./node_modules/@tty-pt/joint/include
 LDLIBS += -ljoint
 ```
 
