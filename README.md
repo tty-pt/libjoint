@@ -4,10 +4,10 @@
 
 # libjoint
 
-[![npm](https://img.shields.io/badge/npm-@tty-pt/joint-CB3837?logo=npm)](npm/README.md)
+[![npm](https://img.shields.io/badge/npm-@tty--pt/joint-CB3837?logo=npm)](npm/README.md)
 [![C99](https://img.shields.io/badge/C-C99-555?logo=c)](#)
 [![BSD-2-Clause](https://img.shields.io/badge/License-BSD--2--Clause-blue)](#)
-[![interval-tree](https://img.shields.io/badge/interval--tree-16A34A)](#)
+[![interval-tree](https://img.shields.io/badge/structure-interval--tree-16A34A)](#)
 [![Recall Kernel Time Axis](https://img.shields.io/badge/axis-time-blueviolet)](#)
 
 > Interval-tree temporal presence engine for querying who was where, when, and with whom across historical time windows in pure C. Canonical header is `<ttypt/joint.h>`.
