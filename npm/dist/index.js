@@ -20,6 +20,10 @@ export class JointTimeline {
     if (!options.wasm && nativeBinding && nativeBinding.init) {
       this.handle = nativeBinding.init(this.filePath);
     }
+    if (!this.handle) {
+      const wasm = getJointWasm();
+      wasm.exports.joint_wasm_clear();
+    }
   }
 
   static wasm() {
@@ -139,6 +143,9 @@ export class JointTimeline {
     if (nativeBinding && this.handle) {
       nativeBinding.close(this.handle);
       this.handle = null;
+    } else {
+      const wasm = getJointWasm();
+      wasm.exports.joint_wasm_clear();
     }
   }
 }
