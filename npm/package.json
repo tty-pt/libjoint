@@ -1,6 +1,6 @@
 {
   "name": "@tty-pt/joint",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "type": "module",
   "description": "Universal Node.js and Browser bindings for libjoint Interval-Tree Temporal Engine",
   "main": "dist/index.js",
