@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.7.0] - 2026-11-13
 
-- **Substrate & Corm v2.3.0 Alignment**:
-  - Upgraded dependencies to @tty-pt/corm@^2.3.0 (>=2.3.0) and @tty-pt/stele@^1.6.0 (>=1.6.0).
+- **Substrate & Corm v2.3.1 Alignment**:
+  - Upgraded dependencies to @tty-pt/corm@^2.3.1 (>=2.3.1) and @tty-pt/stele@^1.6.0 (>=1.6.0).
   - Maintained zero-copy linear memory candidate chaining across CandidateSet and JointTimeline.
 
 ## [1.6.3] - 2026-11-03
