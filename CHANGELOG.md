@@ -5,6 +5,12 @@ All notable changes to libjoint will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-11-13
+
+- **Disjoint Global-Base & Shared-Memory Reactor (`joint.wasm`)**:
+  - Rebuilt `joint.wasm` shared-memory reactor at a disjoint `--global-base=786432` to prevent static data segment collisions across co-loaded WASM modules.
+  - Upgraded `@tty-pt/corm` to `>=2.3.2` (`^2.3.2`) and `@tty-pt/stele` to `>=1.6.1` (`^1.6.1`).
+
 ## [1.7.0] - 2026-11-13
 
 - **Substrate & Corm v2.3.1 Alignment**:

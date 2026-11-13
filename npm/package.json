@@ -1,6 +1,6 @@
 {
   "name": "@tty-pt/joint",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "type": "module",
   "description": "Universal Node.js and Browser bindings for libjoint Interval-Tree Temporal Engine",
   "main": "dist/index.js",
@@ -20,12 +20,12 @@
     "test": "node --test tests/joint.test.mjs"
   },
   "peerDependencies": {
-    "@tty-pt/corm": ">=2.3.1",
-    "@tty-pt/stele": ">=1.6.0"
+    "@tty-pt/corm": ">=2.3.2",
+    "@tty-pt/stele": ">=1.6.1"
   },
   "devDependencies": {
-    "@tty-pt/corm": "^2.3.1",
-    "@tty-pt/stele": "^1.6.0"
+    "@tty-pt/corm": "^2.3.2",
+    "@tty-pt/stele": "^1.6.1"
   },
   "keywords": [
     "joint",
