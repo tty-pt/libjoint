@@ -13,13 +13,17 @@ export function getJointWasm() {
  * JointTimeline: Interval-Tree Temporal Presence & Conflict Engine
  */
 export class JointTimeline {
-  constructor(filePath = "") {
+  constructor(filePath = "", options = {}) {
     this.filePath = filePath;
     this.handle = null;
 
-    if (nativeBinding && nativeBinding.init) {
+    if (!options.wasm && nativeBinding && nativeBinding.init) {
       this.handle = nativeBinding.init(this.filePath);
     }
+  }
+
+  static wasm() {
+    return new JointTimeline("", { wasm: true });
   }
 
   recordInterval(ref, start, end) {

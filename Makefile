@@ -16,7 +16,6 @@ CFLAGS-amd64 := -mpopcnt -mavx2 -mfma
 INSTALL_BIN :=
 
 WASM_SRCS := npm/wasm/joint_wasm.c
-WASM_LDFLAGS += -Wl,--import-memory
 
 include ../mk/include.mk
 
