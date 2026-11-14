@@ -1338,10 +1338,14 @@ joint_store_impl(unsigned jd, rec_ref_t ref, const char *value)
 		return -1;
 	}
 	const char *colon = strchr(value, ':');
+	const char *nl = strchr(value, '\n');
+	const char *sep = colon;
+	if (nl && (!sep || nl < sep))
+		sep = nl;
 	comma = strchr(value, ',');
-	if (colon && (!comma || colon < comma)) {
-		/* mm shape <DATE>:<PAYLOAD> — date prefix is before the colon;
-		 * any commas after the colon belong to the payload (e.g. JSON) */
+	if (sep && (!comma || sep < comma)) {
+		/* mm shape <DATE>:<PAYLOAD> or <DATE>\n<PAYLOAD> — date prefix is before sep;
+		 * any commas after sep belong to the payload (e.g. JSON) */
 		comma = NULL;
 	}
 	if (!comma) {
