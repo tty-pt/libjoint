@@ -5,6 +5,12 @@ All notable changes to libjoint will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-11-14
+
+- **Interval Store Parsing & Packaging (`src/libjoint.c`, `npm/package.json`)**:
+  - Preserved newline delimiter between timestamp header and payload body in `joint_store_impl` instead of mutating the shared buffer in-place.
+  - Explicitly included `"prebuilds"` in `npm/package.json` `"files"`.
+
 ## [1.8.0] - 2026-11-14
 
 - **Complete Node-API Bindings & Open-Ended Intervals (`npm/native/joint_napi.c`, `npm/dist/index.js`)**:
