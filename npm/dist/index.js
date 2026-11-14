@@ -9,6 +9,14 @@ export function getJointWasm() {
   return wasmInstance;
 }
 
+export function scanTime(dateStr) {
+  if (nativeBinding && nativeBinding.scanTime) {
+    return nativeBinding.scanTime(String(dateStr));
+  }
+  const ms = Date.parse(String(dateStr));
+  return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
+}
+
 /**
  * JointTimeline: Interval-Tree Temporal Presence & Conflict Engine
  */
@@ -30,13 +38,55 @@ export class JointTimeline {
     return new JointTimeline("", { wasm: true });
   }
 
+  start(ref, startTs) {
+    if (nativeBinding && this.handle) {
+      return nativeBinding.start(this.handle, ref, startTs);
+    }
+    const wasm = getJointWasm();
+    wasm.exports.joint_wasm_record(ref, BigInt(startTs), BigInt(Number.MAX_SAFE_INTEGER));
+    return true;
+  }
+
+  stop(ref, endTs) {
+    if (nativeBinding && this.handle) {
+      return nativeBinding.stop(this.handle, ref, endTs);
+    }
+    return false;
+  }
+
   recordInterval(ref, start, end) {
     if (nativeBinding && this.handle) {
-      nativeBinding.record(this.handle, ref, start, end);
+      if (end === undefined || end === null) {
+        return nativeBinding.record(this.handle, ref, start);
+      }
+      return nativeBinding.record(this.handle, ref, start, end);
     } else {
       const wasm = getJointWasm();
-      wasm.exports.joint_wasm_record(ref, BigInt(start), BigInt(end));
+      const endVal = end === undefined || end === null ? Number.MAX_SAFE_INTEGER : end;
+      wasm.exports.joint_wasm_record(ref, BigInt(start), BigInt(endVal));
+      return true;
     }
+  }
+
+  erase(ref) {
+    if (nativeBinding && this.handle) {
+      return nativeBinding.erase(this.handle, ref);
+    }
+    return false;
+  }
+
+  storeSpec(ref, specStr) {
+    if (nativeBinding && this.handle) {
+      return nativeBinding.axisStore(this.handle, ref, specStr);
+    }
+    return false;
+  }
+
+  storeTyped(ref, uint8Array, qtype = 0) {
+    if (nativeBinding && this.handle) {
+      return nativeBinding.axisStoreTyped(this.handle, ref, uint8Array, qtype);
+    }
+    return false;
   }
 
   queryOverlaps(start, end) {
@@ -132,7 +182,8 @@ export class JointTimeline {
 
   clear() {
     if (nativeBinding && this.handle) {
-      if (nativeBinding.clear) nativeBinding.clear(this.handle);
+      nativeBinding.close(this.handle);
+      this.handle = nativeBinding.init(this.filePath);
     } else {
       const wasm = getJointWasm();
       wasm.exports.joint_wasm_clear();
@@ -157,25 +208,30 @@ export class JointTemporalAxis {
   constructor(filePath = "") {
     this.name = "temporal";
     this.timeline = new JointTimeline(filePath);
-    this.resourceMapping = new Map();
   }
 
-  registerInterval(ref, resourceId, start, end) {
-    this.resourceMapping.set(ref, resourceId);
+  registerInterval(ref, _resourceId, start, end) {
     this.timeline.recordInterval(ref, start, end);
   }
 
+  start(ref, startTs) {
+    return this.timeline.start(ref, startTs);
+  }
+
+  stop(ref, endTs) {
+    return this.timeline.stop(ref, endTs);
+  }
+
+  erase(ref) {
+    return this.timeline.erase(ref);
+  }
+
+  store(ref, specStr) {
+    return this.timeline.storeSpec(ref, specStr);
+  }
+
   fill(params) {
-    const hits = this.timeline.queryOverlaps(params.start, params.end);
-    const matching = [];
-    for (const ref of hits) {
-      if (params.resourceId !== undefined) {
-        const res = this.resourceMapping.get(ref);
-        if (res !== undefined && res !== params.resourceId) continue;
-      }
-      matching.push(ref);
-    }
-    return matching;
+    return this.timeline.queryOverlaps(params.start, params.end);
   }
 
   close() {

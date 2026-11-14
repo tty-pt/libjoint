@@ -1,6 +1,6 @@
 {
   "name": "@tty-pt/joint",
-  "version": "1.7.3",
+  "version": "1.8.0",
   "type": "module",
   "description": "Universal Node.js and Browser bindings for libjoint Interval-Tree Temporal Engine",
   "main": "dist/index.js",
@@ -14,18 +14,18 @@
     "LICENSE"
   ],
   "scripts": {
-    "build:native": "mkdir -p build/Release && gcc -O3 -fPIC -shared -I/usr/include/node -I../include native/joint_napi.c -L../lib -Wl,-rpath,../lib -L/usr/lib -ljoint -lcorm -o build/Release/joint_node.node 2>/dev/null || true",
+    "build:native": "mkdir -p build/Release && gcc -O3 -fPIC -shared -I/usr/include/node -I../include -I../../libcorm/include native/joint_napi.c -L../lib -L../../libcorm/lib -Wl,-rpath,\\$ORIGIN/../../../lib:\\$ORIGIN/../../../../libcorm/lib -L/usr/lib -ljoint -lcorm -o build/Release/joint_node.node",
     "build:wasm": "make -C .. wasm",
     "build": "npm run build:native && npm run build:wasm",
     "test": "node --test tests/joint.test.mjs"
   },
   "peerDependencies": {
-    "@tty-pt/corm": ">=2.3.3",
-    "@tty-pt/stele": ">=1.6.2"
+    "@tty-pt/corm": ">=2.4.0",
+    "@tty-pt/stele": ">=1.7.0"
   },
   "devDependencies": {
-    "@tty-pt/corm": "^2.3.3",
-    "@tty-pt/stele": "^1.6.2"
+    "@tty-pt/corm": "^2.4.0",
+    "@tty-pt/stele": "^1.7.0"
   },
   "keywords": [
     "joint",

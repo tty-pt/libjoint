@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { JointTimeline, createTimelineController } from "../dist/index.js";
+import { JointTimeline, JointTemporalAxis, scanTime, createTimelineController } from "../dist/index.js";
 
 test("JointTimeline record and overlap intersection", () => {
-  const tmpDir = path.join("/tmp", `joint_npm_test_${Date.now()}`);
+  const tmpDir = path.join(os.tmpdir(), `joint_npm_test_${Date.now()}`);
   fs.mkdirSync(tmpDir, { recursive: true });
   const jointFile = path.join(tmpDir, "test.joint");
 
@@ -31,6 +32,32 @@ test("JointTimeline record and overlap intersection", () => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+test("JointTimeline open-ended start/stop, erase, and scanTime", () => {
+  const timeline = new JointTimeline();
+  timeline.start(501, 1000); // open-ended [1000, +inf)
+  assert.deepEqual(timeline.queryOverlaps(5000, 6000), [501]);
+
+  timeline.stop(501, 2000); // closed [1000, 2000)
+  assert.deepEqual(timeline.queryOverlaps(5000, 6000), []);
+  assert.deepEqual(timeline.queryOverlaps(1200, 1800), [501]);
+
+  assert.equal(timeline.erase(501), true);
+  assert.deepEqual(timeline.queryOverlaps(1200, 1800), []);
+
+  const ts = scanTime("2025-01-01T00:00:00");
+  assert.ok(ts > 1700000000);
+  timeline.close();
+});
+
+test("JointTemporalAxis store grammar and erase", () => {
+  const axis = new JointTemporalAxis();
+  assert.equal(axis.store(77, "100,300"), true);
+  assert.deepEqual(axis.fill({ start: 150, end: 250 }), [77]);
+  assert.equal(axis.erase(77), true);
+  assert.deepEqual(axis.fill({ start: 150, end: 250 }), []);
+  axis.close();
+});
+
 test("createTimelineController provides reactive interval conflict tracking", () => {
   const timeline = new JointTimeline();
   timeline.recordInterval(201, 1000, 2000);
@@ -52,10 +79,11 @@ test("createTimelineController provides reactive interval conflict tracking", ()
   assert.equal(controller.hasConflict, false);
 
   unsubscribe();
+  timeline.close();
 });
 
 test("withOverlaps zero-copy raw memory pointer query", () => {
-  const tmpFile = path.join("/tmp", `test_overlap_${Date.now()}.joint`);
+  const tmpFile = path.join(os.tmpdir(), `test_overlap_${Date.now()}.joint`);
   const timeline = new JointTimeline(tmpFile);
   timeline.recordInterval(301, 1000, 2000);
   timeline.recordInterval(302, 1500, 2500);
