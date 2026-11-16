@@ -5,6 +5,41 @@ All notable changes to libjoint will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-11-14
+
+- **Interval Store Parsing & Packaging (`src/libjoint.c`, `npm/package.json`)**:
+  - Preserved newline delimiter between timestamp header and payload body in `joint_store_impl` instead of mutating the shared buffer in-place.
+  - Explicitly included `"prebuilds"` in `npm/package.json` `"files"`.
+
+## [1.8.0] - 2026-11-14
+
+- **Complete Node-API Bindings & Open-Ended Intervals (`npm/native/joint_napi.c`, `npm/dist/index.js`)**:
+  - Bound `start` (`joint_start`), `stop` (`joint_stop`), `erase` (`joint_erase`), `scanTime` (`sscantime`), and `axisStore`/`axisStoreTyped`/`axisUnstore` in `joint_napi.c`.
+  - Removed JS `resourceMapping` fallback in `JointTimeline` and added open-ended interval support.
+  - Requires `@tty-pt/corm` >=2.4.0 (`^2.4.0`) and `@tty-pt/stele` >=1.7.0 (`^1.7.0`).
+
+## [1.7.3] - 2026-11-13
+
+- **Packaging**:
+  - Requires `@tty-pt/corm` >=2.3.3 (`^2.3.3`) and `@tty-pt/stele` >=1.6.2 (`^1.6.2`).
+  - The npm tarball is built once by CI, with a self-contained native addon per platform (`prebuilds/<os>-<cpu>/`) next to `joint.wasm`, and published as verified.
+
+## [1.7.2] - 2026-11-13
+
+- **Fix (`JointTimeline`, WebAssembly mode)**: the interval buffer is cleared when a timeline is created or closed, so one timeline no longer sees another's intervals.
+
+## [1.7.1] - 2026-11-13
+
+- **Disjoint Global-Base & Shared-Memory Reactor (`joint.wasm`)**:
+  - Rebuilt `joint.wasm` shared-memory reactor at a disjoint `--global-base=786432` to prevent static data segment collisions across co-loaded WASM modules.
+  - Upgraded `@tty-pt/corm` to `>=2.3.2` (`^2.3.2`) and `@tty-pt/stele` to `>=1.6.1` (`^1.6.1`).
+
+## [1.7.0] - 2026-11-13
+
+- **Substrate & Corm v2.3.1 Alignment**:
+  - Upgraded dependencies to @tty-pt/corm@^2.3.1 (>=2.3.1) and @tty-pt/stele@^1.6.0 (>=1.6.0).
+  - Maintained zero-copy linear memory candidate chaining across CandidateSet and JointTimeline.
+
 ## [1.6.3] - 2026-11-03
 
 - **Zero-Copy Shared Memory Chaining (`JointTimeline`) & Substrate Integration**:

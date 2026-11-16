@@ -4,7 +4,7 @@
 
 # @tty-pt/joint
 
-[![npm version](https://img.shields.io/badge/npm-v1.6.3-CB3837?logo=npm)](#)
+[![npm version](https://img.shields.io/badge/npm-v1.8.1-CB3837?logo=npm)](#)
 [![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD--2--Clause-blue)](#)
 [![TypeScript Ready](https://img.shields.io/badge/TypeScript-Ready-3178C6?logo=typescript)](#)
 [![Node.js Native](https://img.shields.io/badge/Node.js-N--API-339933?logo=node.js)](#)
@@ -71,9 +71,11 @@ slider.addEventListener("input", (e) => {
 ### `JointTimeline`
 C99 Interval-tree temporal presence engine wrapping `joint_node.node` / `joint.wasm`.
 * `constructor(filePath?: string)`: Initializes file-backed database or in-memory timeline.
+* `.start(ref: number, ts: number): void` / `.stop(ref: number, ts: number): void`: Records open-ended or closed presence transitions (`joint_start` / `joint_stop`).
 * `.recordInterval(ref: number, start: number, end: number): void`: Records half-open temporal interval $[start, end)$ for entity `ref`.
 * `.queryOverlaps(start: number, end: number): number[]`: Returns array of entity reference IDs overlapping the query window. Strictly executes in compiled WebAssembly / C without JavaScript loops.
-* `.clear(): void`: Clears all registered intervals.
+* `.scanTime(start: number, end: number): Array<{ min: number, max: number, count: number, who: number }>`: Iterates constant-presence slices (`joint_iter` / `joint_next`).
+* `.clear(): void`: Clears all registered intervals (`joint_erase`).
 * `.close(): void`: Flushes changes and closes database handle.
 
 ### `createTimelineController(timeline: JointTimeline)`
@@ -87,6 +89,8 @@ Factory providing reactive state management for per-frame 60/120 FPS calendar sl
 ### `JointTemporalAxis`
 Plug-and-play CormAxis adapter for the Corm Recall Kernel (`@tty-pt/corm`):
 * `.registerInterval(ref: number, resourceId: number, start: number, end: number): void`
+* `.store(ref: number, spec: string): boolean` / `.storeTyped(ref: number, data: Uint8Array | Buffer, qtype?: number): boolean`
+* `.unstore(ref: number): boolean`
 * `.fill(params: { start: number, end: number, resourceId?: number }): number[]`
 
 ### `getJointWasm(): WebAssembly.Instance`
