@@ -11,15 +11,19 @@
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-Reactor-654FF0?logo=webassembly)](#)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-success)](#)
 
-> Universal Node.js and Browser bindings for **`libjoint`**, the high-performance C99 interval-tree temporal presence engine. Features real-time calendar conflict detection, interval intersections, and reactive timeline controllers.
+> Universal Node.js and Browser bindings for **`libjoint`**, the high-performance C99 interval-tree temporal presence engine. Features real-time calendar conflict detection, interval intersections, and reactive timeline controllers. Canonical C header: `<ttypt/joint.h>`.
+
+📖 **Full C & Temporal Engine Documentation**: See the main [**libjoint GitHub README**](https://github.com/tty-pt/libjoint#readme) for interval-tree presence transitions (`joint_start`, `joint_stop`), constant-presence slice iteration, and C API details.
 
 ---
 
-## 1. Quickstart
+## 1. Quickstart & Installation
 
 ```bash
 npm install @tty-pt/joint
 ```
+
+**Native OS Packages (`tty.pt`)**: Prebuilt native C packages (`libjoint`) for Linux (`apt`, `apk`, `pacman`, `dnf`), macOS (`brew`), Windows (`winget`, MSYS2), and OpenBSD (`pkg_add`) are available via the [**tty.pt package repositories**](https://github.com/tty-pt/ci/blob/main/docs/install.md).
 
 ```typescript
 import { JointTimeline, createTimelineController } from "@tty-pt/joint";
@@ -105,23 +109,15 @@ Returns the WebAssembly instance loaded on the Stele shared-memory substrate.
 
 ---
 
-## 4. C Development Headers via NPM
+## 5. C Development Headers & Native Integration
 
 ```makefile
-# Include in your C Makefile:
 CFLAGS += -I./node_modules/@tty-pt/joint/include
 LDLIBS += -ljoint
 ```
 
 ---
 
-## 5. Building from Source
-
-```bash
-make npm-build    # Compiles native addon and WASM reactor
-make npm-test     # Runs verification test suite
-```
-
 ## License
 
-BSD 2-Clause License. Copyright (c) 2026, tty-pt.
+BSD-2-Clause — Copyright (c) 2026, Paulo Quirino <quirinpa@gmail.com>. See [LICENSE](https://github.com/tty-pt/libjoint/blob/main/LICENSE).
